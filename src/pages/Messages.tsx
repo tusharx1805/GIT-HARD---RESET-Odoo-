@@ -90,12 +90,12 @@ const Messages = () => {
       try {
         console.log("Loading messages between:", user.id, "and", selectedChat.id);
         
-        // Load messages with a more reliable query
+        // Use a simpler query approach - note: using 'timestamp' column name
         const { data, error } = await supabase
           .from("messages")
           .select("*")
           .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedChat.id}),and(sender_id.eq.${selectedChat.id},receiver_id.eq.${user.id})`)
-          .order("created_at", { ascending: true });
+          .order("timestamp", { ascending: true });
 
         if (error) {
           console.error("Error loading messages:", error);
@@ -116,7 +116,7 @@ const Messages = () => {
 
           if (sentQuery.data && receivedQuery.data) {
             const allMessages = [...sentQuery.data, ...receivedQuery.data]
-              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
             setMessages(allMessages);
             console.log("Loaded messages (fallback):", allMessages);
           }
@@ -172,7 +172,7 @@ const Messages = () => {
     };
   }, [selectedChat?.id, user?.id]);
 
-  // Enhanced message sending with multiple fallbacks
+  // Enhanced message sending with better error handling
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -186,12 +186,12 @@ const Messages = () => {
     console.log("Sending message:", messageText);
 
     try {
-      // Create message object
+      // Create message object - let Supabase handle the timestamp
       const messageData = {
         sender_id: user.id,
         receiver_id: selectedChat.id,
-        message: messageText,
-        created_at: new Date().toISOString()
+        message: messageText
+        // Remove timestamp - let the database set it with its default value (CURRENT_TIMESTAMP)
       };
 
       console.log("Message data:", messageData);
@@ -205,12 +205,19 @@ const Messages = () => {
 
       if (error) {
         console.error("Error sending message:", error);
-        alert("Failed to send message. Please try again.");
+        // More specific error handling
+        if (error.code === '23503') {
+          alert("User not found. Please refresh the page and try again.");
+        } else if (error.code === '23505') {
+          alert("Message already sent.");
+        } else {
+          alert(`Failed to send message: ${error.message}`);
+        }
       } else {
         console.log("Message sent successfully:", data);
         setNewMessage("");
         
-        // Optimistically add message to UI
+        // Optimistically add message to UI if it's not already there
         setMessages(prev => {
           const exists = prev.some(m => m.id === data.id);
           if (exists) return prev;
@@ -219,7 +226,7 @@ const Messages = () => {
       }
     } catch (err) {
       console.error("Message sending error:", err);
-      alert("Failed to send message. Please check your connection.");
+      alert("Failed to send message. Please check your connection and try again.");
     } finally {
       setIsSending(false);
     }
@@ -230,6 +237,20 @@ const Messages = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage(e);
+    }
+  };
+
+  // Safe date formatting function
+  const formatMessageTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "Invalid time";
+      }
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (err) {
+      console.error("Date formatting error:", err);
+      return "Invalid time";
     }
   };
 
@@ -368,7 +389,7 @@ const Messages = () => {
                         >
                           <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                           <p className="text-xs mt-1 text-right opacity-60">
-                            {new Date(msg.created_at).toLocaleTimeString()}
+                            {formatMessageTime(msg.created_at)}
                           </p>
                         </div>
                       </div>
@@ -420,4 +441,4 @@ const Messages = () => {
   );
 };
 
-export default Messages;  
+export default Messages;
