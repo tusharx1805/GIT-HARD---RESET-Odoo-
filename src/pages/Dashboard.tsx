@@ -1,17 +1,97 @@
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { Search, Users, MessageCircle, User, Star, Filter, Plus } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [filteredProfiles, setFilteredProfiles] = useState<any[]>([]);
+  const [showProfileResults, setShowProfileResults] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const searchResultsRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const categories = ["All", "Technology", "Design", "Language", "Marketing", "Music", "Cooking", "Fitness"];
+
+  // Fetch profiles from Supabase
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*");
+
+        if (error) {
+          throw error;
+        }
+
+        setProfiles(data || []);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load profiles",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfiles();
+  }, [toast]);
+
+  // Filter profiles based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredProfiles([]);
+      setShowProfileResults(false);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = profiles.filter(profile => {
+      const fullName = profile.full_name?.toLowerCase() || "";
+      const bio = profile.bio?.toLowerCase() || "";
+      const location = profile.location?.toLowerCase() || "";
+      const skills = [
+        profile.skills_offered?.toLowerCase() || "",
+        profile.skills_wanted?.toLowerCase() || "",
+        profile.skills?.toLowerCase() || ""
+      ].join(",");
+      
+      return fullName.includes(query) || 
+             bio.includes(query) || 
+             location.includes(query) || 
+             skills.includes(query);
+    });
+
+    setFilteredProfiles(filtered);
+    setShowProfileResults(filtered.length > 0);
+  }, [searchQuery, profiles]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchResultsRef.current && !searchResultsRef.current.contains(event.target as Node)) {
+        setShowProfileResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const skills = [
     {
@@ -140,14 +220,65 @@ const Dashboard = () => {
 
         {/* Search and Filter */}
         <div className="mb-8 space-y-4">
-          <div className="relative">
+          <div className="relative" ref={searchResultsRef}>
             <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
             <Input
               placeholder="Search skills, topics, or people..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.trim() && setShowProfileResults(true)}
               className="pl-10 pr-4 py-3 text-lg border-slate-200 focus:border-slate-400"
             />
+            
+            {/* Profile Search Results Dropdown */}
+            {showProfileResults && (
+              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-y-auto">
+                <div className="p-2 border-b bg-slate-50">
+                  <p className="text-sm font-medium text-slate-700">People</p>
+                </div>
+                {isLoading ? (
+                  <div className="p-4 text-center">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-2 text-sm text-slate-500">Loading profiles...</p>
+                  </div>
+                ) : filteredProfiles.length > 0 ? (
+                  <div>
+                    {filteredProfiles.map((profile) => (
+                      <Link 
+                        to={`/user/${profile.id}`} 
+                        key={profile.id}
+                        className="block p-3 hover:bg-slate-50 transition-colors border-b last:border-0"
+                        onClick={() => setShowProfileResults(false)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                            {(profile.full_name || "U").split(" ").map((word: string) => word[0]).join("")}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{profile.full_name || "Unnamed User"}</p>
+                            <p className="text-sm text-slate-500 truncate">{profile.location || "No location"}</p>
+                            {profile.skills_offered && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {profile.skills_offered.split(',').slice(0, 2).map((skill: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">{skill.trim()}</Badge>
+                                ))}
+                                {profile.skills_offered.split(',').length > 2 && (
+                                  <span className="text-xs text-slate-500">+{profile.skills_offered.split(',').length - 2} more</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center">
+                    <p className="text-sm text-slate-500">No profiles found matching "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
