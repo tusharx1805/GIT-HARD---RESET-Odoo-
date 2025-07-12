@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -45,23 +46,54 @@ const Register = () => {
       return;
     }
 
-    // Simulate registration process
-    setTimeout(() => {
-      if (formData.name && formData.email && formData.password) {
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to SkillSwap! You can now start exchanging skills.",
-        });
-        navigate("/dashboard");
-      } else {
-        toast({
-          title: "Registration failed",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
+    try {
+      // Register with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+            skills: formData.skills,
+            bio: formData.bio
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
       }
+
+      // Create a profile in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          { 
+            id: data.user?.id,
+            full_name: formData.name,
+            skills: formData.skills,
+            bio: formData.bio
+          }
+        ]);
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+      }
+
+      toast({
+        title: "Registration successful!",
+        description: "Welcome to SkillSwap! You can now start exchanging skills.",
+      });
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "An error occurred during registration",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { Users, User, Star, Edit, Plus, Trash2, MessageCircle, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import UserProfile from "@/components/UserProfile";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,6 +23,7 @@ const Profile = () => {
   });
 
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const mySkills = [
     {
@@ -258,6 +261,20 @@ const Profile = () => {
 
           <TabsContent value="settings">
             <div className="space-y-6">
+              {/* Supabase Auth User Profile */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Supabase Auth Profile</CardTitle>
+                  <CardDescription>
+                    Your authenticated user information from Supabase
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UserProfile />
+                </CardContent>
+              </Card>
+              
+              {/* Original Account Settings */}
               <Card>
                 <CardHeader>
                   <CardTitle>Account Settings</CardTitle>
@@ -271,7 +288,7 @@ const Profile = () => {
                     <Input
                       id="email"
                       type="email"
-                      value={profileData.email}
+                      value={user?.email || profileData.email}
                       onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                     />
                   </div>

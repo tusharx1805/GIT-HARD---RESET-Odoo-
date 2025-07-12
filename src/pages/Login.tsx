@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -20,23 +21,31 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login process
-    setTimeout(() => {
-      if (email && password) {
-        toast({
-          title: "Login successful!",
-          description: "Welcome back to SkillSwap",
-        });
-        navigate("/dashboard");
-      } else {
-        toast({
-          title: "Login failed",
-          description: "Please fill in all fields",
-          variant: "destructive",
-        });
+    try {
+      // Authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
+
+      toast({
+        title: "Login successful!",
+        description: "Welcome back to SkillSwap",
+      });
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "An error occurred during login",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
