@@ -15,6 +15,10 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 -- Allow users to view their own profile
 CREATE POLICY "Users can view own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
+  
+-- Allow users to view all profiles (for search functionality)
+CREATE POLICY "Users can view all profiles" ON profiles
+  FOR SELECT USING (true);
 
 -- Allow users to update their own profile
 CREATE POLICY "Users can update own profile" ON profiles

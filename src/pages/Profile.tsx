@@ -76,23 +76,42 @@ const Profile = () => {
   // Search users function
   const searchUsers = async (query) => {
     if (!query.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
+      // If query is empty, load all profiles
+      handleSearchFocus();
       return;
     }
     
     setIsSearching(true);
+    console.log("Searching for:", query);
     
     try {
+      // Search by full_name
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, bio, location")
         .ilike("full_name", `%${query}%`)
-        .limit(5);
-        
-      if (error) throw error;
+        .limit(20);
       
-      setSearchResults(data || []);
+      if (error) {
+        console.error("Search error:", error);
+        throw error;
+      }
+      
+      console.log("Search results:", data);
+      
+      // If no results, show a message but keep the dropdown open
+      if (!data || data.length === 0) {
+        // Load all profiles as fallback
+        const response = await supabase
+          .from("profiles")
+          .select("id, full_name, bio, location")
+          .limit(10);
+          
+        if (response.error) throw response.error;
+        setSearchResults(response.data || []);
+      } else {
+        setSearchResults(data);
+      }
     } catch (error) {
       console.error("Error searching users:", error);
       toast({
@@ -114,6 +133,41 @@ const Profile = () => {
     }, 300);
     
     return () => clearTimeout(timeoutId);
+  };
+  
+  // Initial load of users when search input is focused
+  const handleSearchFocus = () => {
+    // Always load users when focusing the search box
+    const loadInitialUsers = async () => {
+      try {
+        // Get all available profiles
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, bio, location")
+          .limit(10);
+          
+        if (error) {
+          console.error("Error fetching profiles:", error);
+          throw error;
+        }
+        
+        console.log("Loaded profiles:", data);
+        if (data && data.length > 0) {
+          setSearchResults(data);
+          setIsSearching(true);
+        }
+      } catch (error) {
+        console.error("Error loading initial users:", error);
+        toast({
+          title: "Error loading users",
+          description: "Could not load user profiles. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadInitialUsers();
+    setIsSearching(true);
   };
   
   // Navigate to user profile
@@ -247,7 +301,7 @@ const Profile = () => {
             className="w-full pr-8"
             value={searchQuery}
             onChange={handleSearchChange}
-            onFocus={() => searchQuery && setIsSearching(true)}
+            onFocus={handleSearchFocus}
           />
           {searchQuery && (
             <button 
@@ -293,12 +347,12 @@ const Profile = () => {
           </div>
         )}
         
-        {isSearching && searchQuery && searchResults.length === 0 && (
+        {isSearching && searchResults.length === 0 && (
           <div 
             ref={searchResultsRef}
             className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200"
           >
-            <p className="px-4 py-2 text-gray-500">No users found</p>
+            <p className="px-4 py-2 text-gray-500">Loading users...</p>
           </div>
         )}
       </div>
