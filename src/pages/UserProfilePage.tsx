@@ -17,6 +17,12 @@ const UserProfilePage = () => {
     email: "",
     skillsOffered: [] as string[],
     skillsWanted: [] as string[],
+    isAvailable: false,
+    createdAt: "",
+    updatedAt: "",
+    userId: "",
+    skills: "",
+    rawData: {} as any, // Store the raw profile data for displaying all fields
   });
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [filteredProfiles, setFilteredProfiles] = useState<any[]>([]);
@@ -72,6 +78,9 @@ const UserProfilePage = () => {
           typeof data.skills_wanted === 'string' ? data.skills_wanted.split(',').map((s: string) => s.trim()) : data.skills_wanted :
           [];
 
+        // Parse general skills if available
+        const skills = data.skills || "";
+
         setProfileData({
           name: data.full_name || "",
           bio: data.bio || "",
@@ -79,6 +88,12 @@ const UserProfilePage = () => {
           email: data.email || "",
           skillsOffered,
           skillsWanted,
+          isAvailable: data.is_available || false,
+          createdAt: data.created_at || "",
+          updatedAt: data.updated_at || "",
+          userId: data.id || "",
+          skills,
+          rawData: data, // Store raw data to display all fields
         });
         setLoading(false);
       } catch (err) {
@@ -214,6 +229,17 @@ const UserProfilePage = () => {
                     <h1 className="text-2xl font-bold text-gray-900">{profileData.name}</h1>
                     <p className="text-gray-600">{profileData.bio || "No bio available"}</p>
                     <p className="text-sm text-gray-500">{profileData.location || "No location specified"}</p>
+                    <div className="flex items-center mt-2">
+                      <Badge variant={profileData.isAvailable ? "default" : "secondary"} className={`mr-2 ${profileData.isAvailable ? 'bg-green-500' : ''}`}>
+                        {profileData.isAvailable ? "Available" : "Not Available"}
+                      </Badge>
+                      <p className="text-xs text-gray-400">Member since {new Date(profileData.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    {profileData.email && (
+                      <p className="text-sm flex items-center">
+                        <span className="font-medium mr-2">Email:</span> {profileData.email}
+                      </p>
+                    )}
                   </div>
 
                   {/* Right Side: Profile Circle + Buttons */}
@@ -232,10 +258,10 @@ const UserProfilePage = () => {
             </Card>
 
             {/* Skills Section */}
-            <Card>
+            <Card className="mb-8">
               <CardHeader>
                 <CardTitle>Skills</CardTitle>
-                <CardDescription>Skills this user can teach</CardDescription>
+                <CardDescription>Skills this user can teach and wants to learn</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -263,6 +289,58 @@ const UserProfilePage = () => {
                         <p className="text-sm text-gray-500">No skills wanted</p>
                       )}
                     </div>
+                  </div>
+
+                  {profileData.skills && (
+                    <div>
+                      <h3 className="font-medium mb-2">General Skills</h3>
+                      <p className="text-sm">{profileData.skills}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* All Profile Data */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Complete Profile Information</CardTitle>
+                <CardDescription>All available profile data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(profileData.rawData).map(([key, value]) => {
+                      // Skip arrays and objects for direct display
+                      if (typeof value === 'object' && value !== null) return null;
+                      
+                      // Format the key for display
+                      const formattedKey = key.split('_').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ');
+                      
+                      // Format date values
+                      let formattedValue = value;
+                      if (key.includes('_at') && value) {
+                        try {
+                          formattedValue = new Date(value as string).toLocaleString();
+                        } catch (e) {
+                          // Keep original value if date parsing fails
+                        }
+                      }
+                      
+                      // Format boolean values
+                      if (typeof value === 'boolean') {
+                        formattedValue = value ? 'Yes' : 'No';
+                      }
+                      
+                      return (
+                        <div key={key} className="border-b pb-2">
+                          <p className="text-sm font-medium">{formattedKey}</p>
+                          <p className="text-sm break-words">{formattedValue?.toString() || 'Not specified'}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
