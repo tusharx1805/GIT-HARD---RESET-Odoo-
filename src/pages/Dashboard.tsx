@@ -204,10 +204,14 @@ const Dashboard = () => {
       
       // First, find the UUIDs for the skills from the skills table
       // Look up offered skill UUID
+      // Clean up skill name - remove quotes and brackets if present
+      const cleanOfferedSkill = offeredSkill.replace(/[\[\]"]/g, '').trim();
+      console.log(`Looking up offered skill: "${cleanOfferedSkill}"`); 
+      
       const { data: offeredSkillData, error: offeredSkillError } = await supabase
         .from("skills")
         .select("id")
-        .eq("name", offeredSkill)
+        .eq("name", cleanOfferedSkill)
         .single();
       
       if (offeredSkillError || !offeredSkillData) {
@@ -216,10 +220,14 @@ const Dashboard = () => {
       }
       
       // Look up wanted skill UUID
+      // Clean up skill name - remove quotes and brackets if present
+      const cleanWantedSkill = wantedSkill.replace(/[\[\]"]/g, '').trim();
+      console.log(`Looking up wanted skill: "${cleanWantedSkill}"`); 
+      
       const { data: wantedSkillData, error: wantedSkillError } = await supabase
         .from("skills")
         .select("id")
-        .eq("name", wantedSkill)
+        .eq("name", cleanWantedSkill)
         .single();
       
       if (wantedSkillError || !wantedSkillData) {
@@ -462,8 +470,24 @@ const Dashboard = () => {
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                               onClick={() => {
                                 // Find a skill to offer and a skill to request
-                                const offeredSkill = currentUser?.skills_offered?.split(',')[0]?.trim() || "General Skills";
-                                const wantedSkill = profile.skills_offered?.split(',')[0]?.trim() || "General Skills";
+                                // Parse skills properly - remove any array notation if present
+                                const parseSkill = (skillStr: string | null | undefined): string => {
+                                  if (!skillStr) return "General Skills";
+                                  
+                                  // Remove array notation if present
+                                  let cleaned = skillStr.trim();
+                                  if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+                                    cleaned = cleaned.substring(1, cleaned.length - 1);
+                                  }
+                                  
+                                  // Get first skill from comma-separated list
+                                  const skills = cleaned.split(',');
+                                  const firstSkill = skills[0]?.trim().replace(/\"/g, '');
+                                  return firstSkill || "General Skills";
+                                };
+                                
+                                const offeredSkill = parseSkill(currentUser?.skills_offered);
+                                const wantedSkill = parseSkill(profile.skills_offered);
                                 handleSendRequest(profile.id, offeredSkill, wantedSkill);
                               }}
                             >

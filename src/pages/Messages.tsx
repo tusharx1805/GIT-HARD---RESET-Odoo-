@@ -7,10 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-<<<<<<< HEAD
-import { MessageCircle, Send, Search, Loader2 } from "lucide-react";
-import Navigation from "@/components/Navigation";
-=======
 import {
   Users,
   MessageCircle,
@@ -20,7 +16,7 @@ import {
   ArrowLeft,
   Loader2,
 } from "lucide-react";
->>>>>>> d3e053cc6b936f04c7f6359185d0cb2146992a6a
+import Navigation from "@/components/Navigation";
 
 const Messages = () => {
   const [user, setUser] = useState<any>(null);
@@ -142,9 +138,6 @@ const Messages = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-<<<<<<< HEAD
-      <Navigation showBreadcrumbs={true} currentPage="Messages" />
-=======
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -171,7 +164,6 @@ const Messages = () => {
           </div>
         </div>
       </header>
->>>>>>> d3e053cc6b936f04c7f6359185d0cb2146992a6a
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">

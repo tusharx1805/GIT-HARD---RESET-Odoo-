@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,19 +24,48 @@ const RequestSkill = () => {
   // Fetch current user
   useEffect(() => {
     const fetchCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error("Error fetching user:", authError);
+        return;
+      }
+      
       if (user) {
-        const { data } = await supabase
+        const { data, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
+          
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          return;
+        }
+        
         setCurrentUser(data);
       }
     };
     
     fetchCurrentUser();
   }, []);
+
+  // Helper function to get skill name from skills table
+  const getSkillName = async (skillId: string) => {
+    if (!skillId) return "Unknown Skill";
+    
+    const { data, error } = await supabase
+      .from("skills")
+      .select("name")
+      .eq("id", skillId)
+      .single();
+      
+    if (error) {
+      console.error("Error fetching skill:", error);
+      return "Unknown Skill";
+    }
+    
+    return data?.name || "Unknown Skill";
+  };
 
   // Fetch all requests related to the current user
   useEffect(() => {
@@ -57,9 +85,7 @@ const RequestSkill = () => {
             receiver_id,
             offered_skill,
             wanted_skill,
-            profiles!swap_requests_sender_id_fkey(full_name, avatar_url),
-            skills:offered_skill(name),
-            wanted:wanted_skill(name)
+            message
           `)
           .eq("sender_id", currentUser.id);
 
@@ -73,9 +99,7 @@ const RequestSkill = () => {
             receiver_id,
             offered_skill,
             wanted_skill,
-            profiles!swap_requests_sender_id_fkey(full_name, avatar_url),
-            skills:offered_skill(name),
-            wanted:wanted_skill(name)
+            message
           `)
           .eq("receiver_id", currentUser.id);
 
@@ -83,35 +107,44 @@ const RequestSkill = () => {
           throw sentError || receivedError;
         }
 
-        // Combine and format requests
+        // Combine requests
         const allRequests = [...(sentRequests || []), ...(receivedRequests || [])];
         
-        // Get additional user info for each request
+        // Get additional info for each request
         const formattedRequests = await Promise.all(allRequests.map(async (request) => {
           // Determine if current user is sender or receiver
           const isCurrentUserSender = request.sender_id === currentUser.id;
           const otherUserId = isCurrentUserSender ? request.receiver_id : request.sender_id;
           
           // Get other user's profile
-          const { data: otherUser } = await supabase
+          const { data: data, error: profileError } = await supabase
             .from("profiles")
-            .select("full_name, avatar_url, rating")
+            .select("full_name, avatar_url, rating, email")
             .eq("id", otherUserId)
             .single();
+
+          if (profileError) {
+            console.error("Error fetching other user's profile:", profileError, "for userId:", otherUserId);
+          }
+          console.log("Fetched profile for otherUserId:", otherUserId, data);
+
+          // Get skill names name: 
+          const offeredSkillName = await getSkillName(request.offered_skill);
+          const wantedSkillName = await getSkillName(request.wanted_skill);
             
           return {
             id: request.id,
-            name: otherUser?.full_name || "Unknown User",
-            avatar: otherUser?.avatar_url ? 
-              <img src={otherUser.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : 
-              (otherUser?.full_name?.charAt(0) || "U"),
-            skillOffered: isCurrentUserSender ? request.skills : request.wanted,
-            skillWanted: isCurrentUserSender ? request.wanted : request.skills,
+            name: data?.full_name || data?.email || `Click on view profile`,
+            avatarUrl: data?.avatar_url || null,
+            avatarInitial: (data?.full_name?.charAt(0) || data?.email?.charAt(0) || "U"),
+            skillOffered: isCurrentUserSender ? offeredSkillName : wantedSkillName,
+            skillWanted: isCurrentUserSender ? wantedSkillName : offeredSkillName,
             status: request.status,
-            rating: otherUser?.rating || 0,
+            rating: data?.rating || 0,
             date: new Date(request.created_at).toLocaleDateString(),
             isCurrentUserSender,
-            otherUserId
+            otherUserId,
+            message: request.message
           };
         }));
         
@@ -216,14 +249,12 @@ const RequestSkill = () => {
       });
     }
   };
-  
-
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Pending": return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "Accepted": return "bg-green-100 text-green-800 border-green-300";
-      case "Rejected": return "bg-red-100 text-red-800 border-red-300";
+    switch (status.toLowerCase()) {
+      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-300";
+      case "accepted": return "bg-green-100 text-green-800 border-green-300";
+      case "rejected": return "bg-red-100 text-red-800 border-red-300";
       default: return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
@@ -275,7 +306,10 @@ const RequestSkill = () => {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
                       <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-semibold text-lg overflow-hidden">
-                        {request.avatar}
+                        {request.avatarUrl ? 
+                          <img src={request.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : 
+                          request.avatarInitial
+                        }
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
@@ -305,6 +339,11 @@ const RequestSkill = () => {
                             Requested on {request.date}
                           </span>
                         </div>
+                        {request.message && (
+                          <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-700">
+                            <strong>Message:</strong> {request.message}
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -313,7 +352,7 @@ const RequestSkill = () => {
                         Status: {request.status}
                       </div>
                       
-                      {request.status === "pending" && !request.isCurrentUserSender && (
+                      {request.status.toLowerCase() === "pending" && !request.isCurrentUserSender && (
                         <div className="flex space-x-2">
                           <Button
                             size="sm"
@@ -333,7 +372,7 @@ const RequestSkill = () => {
                         </div>
                       )}
                       
-                      {request.status === "accepted" && (
+                      {request.status.toLowerCase() === "accepted" && (
                         <Link to="/messages">
                           <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                             <MessageCircle className="w-4 h-4 mr-1" />
@@ -363,25 +402,35 @@ const RequestSkill = () => {
           )}
         </div>
 
-        {/* Pagination */}
-        <div className="flex justify-center items-center space-x-2 mt-8 pt-6 border-t">
-          <Button variant="outline" size="sm" disabled>
-            &lt;
-          </Button>
-          {[1, 2, 3, 4].map((page) => (
+        {/* Pagination - Only show if we have multiple pages */}
+        {filteredRequests.length > 0 && (
+          <div className="flex justify-center items-center space-x-2 mt-8 pt-6 border-t">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {}} // TODO: Implement pagination
+              disabled={true} // Disable until pagination is implemented
+            >
+              &lt;
+            </Button>
             <Button
-              key={page}
-              variant={page === 1 ? "default" : "outline"}
+              variant="default"
               size="sm"
               className="w-8 h-8"
+              disabled
             >
-              {page}
+              1
             </Button>
-          ))}
-          <Button variant="outline" size="sm">
-            &gt;
-          </Button>
-        </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {}} // TODO: Implement pagination
+              disabled={true} // Disable until pagination is implemented
+            >
+              &gt;
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
