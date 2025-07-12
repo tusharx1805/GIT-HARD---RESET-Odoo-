@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import UserProfilePage from "./pages/UserProfilePage";
 import Messages from "./pages/Messages";
 import SkillDetails from "./pages/SkillDetails";
 import RequestSkill from "./pages/RequestSkill";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/user/:id" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           <Route path="/requests" element={<ProtectedRoute><RequestSkill /></ProtectedRoute>} />
           <Route path="/skill/:id" element={<ProtectedRoute><SkillDetails /></ProtectedRoute>} />

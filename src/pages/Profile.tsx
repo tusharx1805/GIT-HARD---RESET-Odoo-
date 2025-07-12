@@ -9,9 +9,9 @@ import UserProfile from "@/components/UserProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Edit, MessageCircle, Plus, Star, Trash2, Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Edit, MessageCircle, Plus, Search, Star, Trash2, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,37 +21,107 @@ const Profile = () => {
   location: "",
   email: ""
 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchResultsRef = useRef(null);
+  const navigate = useNavigate();
 
   const { toast } = useToast();
   const { user } = useAuth();
+  
   useEffect(() => {
-  const fetchProfile = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
+    const fetchProfile = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
 
-    if (!userId) return;
+      if (!userId) return;
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
-    if (error) {
-      console.error("Failed to fetch profile:", error);
+      if (error) {
+        console.error("Failed to fetch profile:", error);
+        return;
+      }
+
+      setProfileData({
+        name: data.full_name || "",
+        bio: data.bio || "",
+        location: data.location || "",
+        email: data.email || "",
+      });
+    };
+
+    fetchProfile();
+  }, []);
+  
+  // Handle click outside search results to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchResultsRef.current && !searchResultsRef.current.contains(event.target)) {
+        setIsSearching(false);
+      }
+    };
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  
+  // Search users function
+  const searchUsers = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
       return;
     }
-
-    setProfileData({
-      name: data.full_name || "",
-      bio: data.bio || "",
-      location: data.location || "",
-      email: data.email || "",
-    });
+    
+    setIsSearching(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, bio, location")
+        .ilike("full_name", `%${query}%`)
+        .limit(5);
+        
+      if (error) throw error;
+      
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      toast({
+        title: "Search failed",
+        description: "Could not search for users. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
-
-  fetchProfile();
-}, []);
+  
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    // Debounce search to avoid too many requests
+    const timeoutId = setTimeout(() => {
+      searchUsers(query);
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  };
+  
+  // Navigate to user profile
+  const goToUserProfile = (userId) => {
+    setIsSearching(false);
+    setSearchQuery("");
+    navigate(`/user/${userId}`);
+  };
 
 
   const mySkills = [
@@ -170,11 +240,68 @@ const Profile = () => {
   <CardHeader>
     {/* Top Row: Search + Buttons */}
     <div className="flex justify-between items-center mb-4">
-      <Input
-        placeholder="Search users..."
-        className="w-1/3"
-        // Optional: Add onChange logic here
-      />
+      <div className="relative w-1/3">
+        <div className="relative">
+          <Input
+            placeholder="Search users..."
+            className="w-full pr-8"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            onFocus={() => searchQuery && setIsSearching(true)}
+          />
+          {searchQuery && (
+            <button 
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              onClick={() => {
+                setSearchQuery("");
+                setSearchResults([]);
+                setIsSearching(false);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        
+        {/* Search Results Dropdown */}
+        {isSearching && searchResults.length > 0 && (
+          <div 
+            ref={searchResultsRef}
+            className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-auto"
+          >
+            <ul className="py-1">
+              {searchResults.map((profile) => (
+                <li 
+                  key={profile.id}
+                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => goToUserProfile(profile.id)}
+                >
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold mr-2">
+                      {profile.full_name?.split(" ").map(word => word[0]).join("") || "U"}
+                    </div>
+                    <div>
+                      <p className="font-medium">{profile.full_name}</p>
+                      {profile.location && (
+                        <p className="text-xs text-gray-500">{profile.location}</p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {isSearching && searchQuery && searchResults.length === 0 && (
+          <div 
+            ref={searchResultsRef}
+            className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200"
+          >
+            <p className="px-4 py-2 text-gray-500">No users found</p>
+          </div>
+        )}
+      </div>
       <div className="flex items-center space-x-4">
         <Link to="/dashboard">
           <Button variant="ghost" size="sm">
