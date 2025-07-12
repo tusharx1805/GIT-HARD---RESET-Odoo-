@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Users, MessageCircle, User, Star, Filter, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Users, MessageCircle, User, Star, Filter, Plus, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +24,29 @@ const Dashboard = () => {
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out."
+      });
+      
+      // Redirect to login page or home page after logout
+      navigate('/');
+    } catch (error) {
+      console.error("Error logging out:", error);
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
   
   const PROFILES_PER_PAGE = 3;
 
@@ -175,6 +198,16 @@ const Dashboard = () => {
     setTotalPages(Math.ceil(filtered.length / PROFILES_PER_PAGE) || 1);
   }, [profiles, currentPage, selectedCategory, PROFILES_PER_PAGE]);
   
+  // Helper function to generate a valid UUID v4 format
+  const generateUUID = () => {
+    // Using the standard UUID v4 format with random values
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  
   const handleSendRequest = async (receiverId: string, offeredSkill: string, wantedSkill: string) => {
     if (!currentUser) {
       toast({
@@ -186,14 +219,44 @@ const Dashboard = () => {
     }
     
     try {
+      console.log(`Looking up UUIDs for skills: ${offeredSkill}, ${wantedSkill}`);
+      
+      // First, find the UUIDs for the skills from the skills table
+      // Look up offered skill UUID
+      const { data: offeredSkillData, error: offeredSkillError } = await supabase
+        .from("skills")
+        .select("id")
+        .eq("name", offeredSkill)
+        .single();
+      
+      if (offeredSkillError || !offeredSkillData) {
+        console.error("Error finding offered skill:", offeredSkillError);
+        throw new Error(`Skill "${offeredSkill}" not found in the skills table`);
+      }
+      
+      // Look up wanted skill UUID
+      const { data: wantedSkillData, error: wantedSkillError } = await supabase
+        .from("skills")
+        .select("id")
+        .eq("name", wantedSkill)
+        .single();
+      
+      if (wantedSkillError || !wantedSkillData) {
+        console.error("Error finding wanted skill:", wantedSkillError);
+        throw new Error(`Skill "${wantedSkill}" not found in the skills table`);
+      }
+      
+      console.log(`Found skill UUIDs: ${offeredSkillData.id}, ${wantedSkillData.id}`);
+      
+      // Insert the swap request with the skill UUIDs
       const { error } = await supabase
         .from("swap_requests")
         .insert([
           {
             sender_id: currentUser.id,
             receiver_id: receiverId,
-            offered_skill: offeredSkill,
-            wanted_skill: wantedSkill,
+            offered_skill: offeredSkillData.id, // Use the UUID from the skills table
+            wanted_skill: wantedSkillData.id, // Use the UUID from the skills table
             status: "pending",
             created_at: new Date().toISOString()
           }
@@ -258,6 +321,15 @@ const Dashboard = () => {
                   Profile
                 </Button>
               </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-slate-600 hover:text-slate-900" 
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
