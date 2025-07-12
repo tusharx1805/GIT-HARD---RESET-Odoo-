@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [customSkill, setCustomSkill] = useState("");
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
   const [filteredSkills, setFilteredSkills] = useState<string[]>([]);
   const [profileData, setProfileData] = useState({
@@ -136,13 +137,24 @@ const Profile = () => {
   
   // Add a skill to the offered skills list
   const addSkillOffered = (skill: string) => {
-    if (!profileData.skillsOffered.includes(skill)) {
+    if (skill.trim() !== "" && !profileData.skillsOffered.includes(skill.trim())) {
       setProfileData(prev => ({
         ...prev,
-        skillsOffered: [...prev.skillsOffered, skill]
+        skillsOffered: [...prev.skillsOffered, skill.trim()]
       }));
     }
     setSearchQuery(""); // Clear search after adding
+  };
+  
+  // Add a custom skill to the offered skills list
+  const addCustomSkillOffered = () => {
+    if (customSkill.trim() !== "" && !profileData.skillsOffered.includes(customSkill.trim())) {
+      setProfileData(prev => ({
+        ...prev,
+        skillsOffered: [...prev.skillsOffered, customSkill.trim()]
+      }));
+      setCustomSkill(""); // Clear custom skill input after adding
+    }
   };
 
   // Remove a skill from the offered skills list
@@ -369,6 +381,30 @@ const Profile = () => {
                       />
                     </div>
                     <Button variant="outline" onClick={() => setSearchQuery("")}>Clear</Button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="text-xs" 
+                      onClick={() => {
+                        // Move all skills from Skills Wanted to Skills Offered
+                        if (profileData.skillsWanted.length > 0) {
+                          setProfileData(prev => ({
+                            ...prev,
+                            skillsOffered: [...new Set([...prev.skillsOffered, ...prev.skillsWanted])],
+                            skillsWanted: []
+                          }));
+                          toast({
+                            title: "Skills Moved",
+                            description: "All skills wanted have been moved to skills offered."
+                          });
+                        }
+                      }}
+                    >
+                      Move All to Skills Offered
+                    </Button>
                   </div>
                   
                   {searchQuery && (
