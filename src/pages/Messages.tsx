@@ -1,104 +1,101 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { Users, MessageCircle, User, Send, Search, ArrowLeft } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Messages = () => {
-  const [selectedChat, setSelectedChat] = useState<number | null>(1);
+  const [user, setUser] = useState<any>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedChat, setSelectedChat] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const conversations = [
-    {
-      id: 1,
-      name: "Sarah Chen",
-      avatar: "SC",
-      lastMessage: "Great! Let's schedule our React session for tomorrow.",
-      time: "2 min ago",
-      unread: 2,
-      skill: "React Development",
-      online: true
-    },
-    {
-      id: 2,
-      name: "Mike Johnson",
-      avatar: "MJ",
-      lastMessage: "I can help you with the design principles we discussed.",
-      time: "1 hour ago",
-      unread: 0,
-      skill: "UI/UX Design",
-      online: false
-    },
-    {
-      id: 3,
-      name: "Maria Rodriguez",
-      avatar: "MR",
-      lastMessage: "¡Hola! Ready for our Spanish practice session?",
-      time: "3 hours ago",
-      unread: 1,
-      skill: "Spanish Conversation",
-      online: true
-    },
-    {
-      id: 4,
-      name: "Tom Wilson",
-      avatar: "TW",
-      lastMessage: "Here are the guitar chords I mentioned.",
-      time: "1 day ago",
-      unread: 0,
-      skill: "Guitar Lessons",
-      online: false
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from("swap_requests")
+        .select("*, profiles!swap_requests_sender_id_fkey(full_name), profiles!swap_requests_receiver_id_fkey(full_name)")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .eq("status", "accepted")
+        .then(({ data, error }) => {
+          if (error) console.error(error);
+          else {
+            const result = data.map((swap: any) => {
+              const isSender = swap.sender_id === user.id;
+              const partner = isSender ? swap.profiles_1 : swap.profiles;
+              return {
+                id: swap.id,
+                partner_id: isSender ? swap.receiver_id : swap.sender_id,
+                partner_name: partner.full_name,
+                skill: `${swap.offered_skill} ⇄ ${swap.wanted_skill}`,
+              };
+            });
+            setConversations(result);
+          }
+        });
     }
-  ];
+  }, [user]);
 
-  const messages = [
-    {
-      id: 1,
-      sender: "Sarah Chen",
-      content: "Hi! I saw you're interested in learning React. I'd love to help!",
-      time: "10:30 AM",
-      isMe: false
-    },
-    {
-      id: 2,
-      sender: "You",
-      content: "That would be amazing! I've been trying to learn hooks and context.",
-      time: "10:32 AM",
-      isMe: true
-    },
-    {
-      id: 3,
-      sender: "Sarah Chen",
-      content: "Perfect! Those are great topics. I can show you some practical examples.",
-      time: "10:35 AM",
-      isMe: false
-    },
-    {
-      id: 4,
-      sender: "Sarah Chen",
-      content: "Great! Let's schedule our React session for tomorrow.",
-      time: "10:37 AM",
-      isMe: false
-    }
-  ];
+  useEffect(() => {
+    if (!selectedChat) return;
+    supabase
+      .from("messages")
+      .select("*")
+      .eq("swap_id", selectedChat.id)
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) console.error(error);
+        else setMessages(data);
+      });
 
-  const selectedConversation = conversations.find(conv => conv.id === selectedChat);
+    const subscription = supabase
+      .channel("realtime:messages")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload) => {
+          if (payload.new.swap_id === selectedChat.id) {
+            setMessages((prev) => [...prev, payload.new]);
+          }
+        }
+      )
+      .subscribe();
 
-  const handleSendMessage = (e: React.FormEvent) => {
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [selectedChat]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim()) {
-      console.log("Sending message:", newMessage);
-      setNewMessage("");
-    }
+    if (!newMessage.trim() || !selectedChat) return;
+
+    const { error } = await supabase.from("messages").insert({
+      sender_id: user.id,
+      receiver_id: selectedChat.partner_id,
+      swap_id: selectedChat.id,
+      message: newMessage,
+    });
+
+    if (!error) setNewMessage("");
+    else console.error(error);
   };
+
+  const filteredConversations = conversations.filter((conv) =>
+    conv.partner_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -106,19 +103,19 @@ const Messages = () => {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <Link to="/" className="text-xl font-bold text-gray-900">SkillSwap</Link>
+              <Link to="/" className="text-xl font-bold text-gray-900">
+                SkillSwap
+              </Link>
             </div>
             <div className="flex items-center space-x-4">
               <Link to="/dashboard">
                 <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Skills
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Back to Skills
                 </Button>
               </Link>
               <Link to="/profile">
                 <Button variant="ghost" size="sm">
-                  <User className="w-4 h-4 mr-2" />
-                  Profile
+                  <User className="w-4 h-4 mr-2" /> Profile
                 </Button>
               </Link>
             </div>
@@ -128,13 +125,11 @@ const Messages = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
-          {/* Conversations List */}
           <div className="lg:col-span-1">
             <Card className="h-full">
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Messages
+                  <MessageCircle className="w-5 h-5 mr-2" /> Messages
                 </CardTitle>
                 <div className="relative">
                   <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -146,46 +141,40 @@ const Messages = () => {
                   />
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-y-auto">
                 <div className="space-y-1">
-                  {conversations.map((conversation) => (
+                  {filteredConversations.map((conversation) => (
                     <div
                       key={conversation.id}
-                      onClick={() => setSelectedChat(conversation.id)}
+                      onClick={() => setSelectedChat(conversation)}
                       className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${
-                        selectedChat === conversation.id ? 'bg-blue-50 border-r-2 border-r-blue-500' : ''
+                        selectedChat?.id === conversation.id
+                          ? "bg-blue-50 border-r-2 border-r-blue-500"
+                          : ""
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className="relative">
                           <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                            {conversation.avatar}
+                            {conversation.partner_name
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .join("")
+                              .slice(0, 2)}
                           </div>
-                          {conversation.online && (
-                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-gray-900 truncate">
-                              {conversation.name}
+                              {conversation.partner_name}
                             </h3>
-                            <span className="text-xs text-gray-500">{conversation.time}</span>
+                            <span className="text-xs text-gray-500">now</span>
                           </div>
                           <Badge variant="outline" className="text-xs mb-1">
                             {conversation.skill}
                           </Badge>
-                          <p className="text-sm text-gray-600 truncate">
-                            {conversation.lastMessage}
-                          </p>
+                          <p className="text-sm text-gray-600 truncate">Last message...</p>
                         </div>
-                        {conversation.unread > 0 && (
-                          <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                            <span className="text-xs text-white font-semibold">
-                              {conversation.unread}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -196,58 +185,52 @@ const Messages = () => {
 
           {/* Chat Area */}
           <div className="lg:col-span-2">
-            {selectedConversation ? (
+            {selectedChat ? (
               <Card className="h-full flex flex-col">
-                {/* Chat Header */}
                 <CardHeader className="border-b">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
                       <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                        {selectedConversation.avatar}
+                        {selectedChat.partner_name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .slice(0, 2)}
                       </div>
-                      {selectedConversation.online && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                      )}
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        {selectedConversation.name}
+                        {selectedChat.partner_name}
                       </h3>
                       <Badge variant="outline" className="text-xs">
-                        {selectedConversation.skill}
+                        {selectedChat.skill}
                       </Badge>
                     </div>
                   </div>
                 </CardHeader>
 
-                {/* Messages */}
                 <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((message) => (
+                  {messages.map((msg) => (
                     <div
-                      key={message.id}
-                      className={`flex ${message.isMe ? 'justify-end' : 'justify-start'}`}
+                      key={msg.id}
+                      className={`flex ${msg.sender_id === user?.id ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.isMe
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-900'
+                        className={`max-w-xs px-4 py-2 rounded-lg ${
+                          msg.sender_id === user?.id
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-900"
                         }`}
                       >
-                        <p className="text-sm">{message.content}</p>
-                        <p
-                          className={`text-xs mt-1 ${
-                            message.isMe ? 'text-blue-100' : 'text-gray-500'
-                          }`}
-                        >
-                          {message.time}
+                        <p className="text-sm">{msg.message}</p>
+                        <p className="text-xs mt-1 text-right opacity-60">
+                          {new Date(msg.created_at).toLocaleTimeString()}
                         </p>
                       </div>
                     </div>
                   ))}
                 </CardContent>
 
-                {/* Message Input */}
                 <div className="border-t p-4">
                   <form onSubmit={handleSendMessage} className="flex space-x-2">
                     <Input
