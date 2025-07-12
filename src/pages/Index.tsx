@@ -60,23 +60,23 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200">
+      <header className="bg-white border-b border-blue-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-semibold text-slate-900">SkillSwap Platform</span>
+              <span className="text-xl font-semibold text-foreground">SkillSwap Platform</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link to="/login">
-                <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
+                <Button variant="ghost" className="text-foreground hover:text-primary">
                   Login
                 </Button>
               </Link>
               <Link to="/register">
-                <Button className="bg-slate-900 hover:bg-slate-800 text-white">
+                <Button className="bg-primary hover:bg-primary/90 text-white">
                   Get Started
                 </Button>
               </Link>
@@ -86,25 +86,25 @@ const Index = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-br from-slate-50 to-gray-100">
+      <section className="py-20 bg-gradient-to-br from-background to-accent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-bold text-slate-900 mb-6">
+          <h1 className="text-5xl font-bold text-foreground mb-6">
             Exchange Skills,<br />
-            <span className="text-slate-700">Expand Horizons</span>
+            <span className="text-primary">Expand Horizons</span>
           </h1>
-          <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
             Connect with people worldwide to learn new skills and share your expertise. 
             Build meaningful connections while growing personally and professionally.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/dashboard">
-              <Button size="lg" className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3">
+            <Link to="/register">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-3">
                 Explore Skills
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <Link to="/register">
-              <Button size="lg" variant="outline" className="border-slate-300 text-slate-700 hover:bg-slate-50 px-8 py-3">
+              <Button size="lg" variant="outline" className="border-primary/20 text-primary hover:bg-accent px-8 py-3">
                 Share Your Skills
               </Button>
             </Link>
@@ -116,20 +116,22 @@ const Index = () => {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-semibold text-slate-900 mb-4">How SkillSwap Works</h2>
-            <p className="text-lg text-slate-600">Simple, effective, and rewarding skill exchange</p>
+            <h2 className="text-3xl font-semibold text-foreground mb-4">How SkillSwap Works</h2>
+            <p className="text-lg text-muted-foreground">Simple, effective, and rewarding skill exchange</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center border-slate-200 hover:shadow-lg transition-shadow">
+              <Card key={index} className="text-center border-border hover:shadow-lg transition-shadow hover:border-primary/30">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
-                    {feature.icon}
+                    <div className="p-3 rounded-full bg-accent text-primary">
+                      {feature.icon}
+                    </div>
                   </div>
-                  <CardTitle className="text-xl text-slate-900">{feature.title}</CardTitle>
+                  <CardTitle className="text-xl text-foreground">{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-slate-600">
+                  <CardDescription className="text-muted-foreground">
                     {feature.description}
                   </CardDescription>
                 </CardContent>
@@ -139,95 +141,24 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Featured Skills */}
-      <section className="py-16 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-semibold text-slate-900 mb-4">Featured Skills</h2>
-            <p className="text-lg text-slate-600">Discover popular skills from our community</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {featuredSkills.map((skill) => (
-              <Card key={skill.id} className="hover:shadow-lg transition-shadow border-slate-200">
-                <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-slate-300">
-                      {skill.category}
-                    </Badge>
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm text-slate-600 ml-1">
-                        {skill.rating} ({skill.reviews})
-                      </span>
-                    </div>
-                  </div>
-                  <CardTitle className="text-lg text-slate-900">{skill.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                        {skill.userAvatar}
-                      </div>
-                      <span className="text-sm text-slate-700">{skill.user}</span>
-                    </div>
-                    <Badge variant="outline" className="border-slate-300 text-slate-600">
-                      {skill.level}
-                    </Badge>
-                  </div>
-                  <Link to={`/skill/${skill.id}`}>
-                    <Button variant="outline" size="sm" className="w-full border-slate-300 text-slate-700 hover:bg-slate-50">
-                      View Details
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="text-center mt-8">
-            <Link to="/dashboard">
-              <Button className="bg-slate-900 hover:bg-slate-800 text-white">
-                View All Skills
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+
 
       {/* CTA Section */}
-      <section className="py-16 bg-slate-900">
+      <section className="py-20 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-semibold text-white mb-4">
             Ready to Start Your Skill Journey?
           </h2>
-          <p className="text-xl text-slate-300 mb-8">
-            Join thousands of learners and teachers in our growing community
+          <p className="text-xl text-primary-foreground/90 mb-8">
+            Join our community today and begin exchanging skills with others.
           </p>
           <Link to="/register">
-            <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 px-8 py-3">
-              Join SkillSwap Today
+            <Button size="lg" className="bg-white text-primary hover:bg-primary-foreground px-8 py-3 shadow-lg">
+              Create Your Account
             </Button>
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-slate-900">SkillSwap Platform</span>
-            </div>
-            <div className="text-slate-600">
-              © 2024 SkillSwap Platform. All rights reserved.
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Users, MessageCircle, User, Star, Filter, Plus, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { Search, Star, Filter, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import Navigation from "@/components/Navigation";
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,28 +26,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Logout function
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out."
-      });
-      
-      // Redirect to login page or home page after logout
-      navigate('/');
-    } catch (error) {
-      console.error("Error logging out:", error);
-      toast({
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
+
   
   const PROFILES_PER_PAGE = 3;
 
@@ -76,7 +56,8 @@ const Dashboard = () => {
         setIsLoading(true);
         const { data, error } = await supabase
           .from("profiles")
-          .select("*");
+          .select("*")
+          .order('created_at', { ascending: false });
 
         if (error) {
           throw error;
@@ -293,47 +274,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <Link to="/" className="text-xl font-semibold text-slate-900">SkillSwap Platform</Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/requests">
-                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Requests
-                </Button>
-              </Link>
-              <Link to="/messages">
-                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Messages
-                </Button>
-              </Link>
-              <Link to="/profile">
-                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                  <User className="w-4 h-4 mr-2" />
-                  Profile
-                </Button>
-              </Link>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-slate-600 hover:text-slate-900" 
-                onClick={handleLogout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation showBreadcrumbs={false} currentPage="Dashboard" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import { Users, MessageCircle, User, Send, Search, ArrowLeft, Loader2 } from "lucide-react";
+import { MessageCircle, Send, Search, Loader2 } from "lucide-react";
+import Navigation from "@/components/Navigation";
 
 const Messages = () => {
   const [user, setUser] = useState<any>(null);
@@ -260,30 +261,7 @@ const Messages = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <Link to="/" className="text-xl font-bold text-gray-900">SkillSwap</Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back to Skills
-                </Button>
-              </Link>
-              <Link to="/profile">
-                <Button variant="ghost" size="sm">
-                  <User className="w-4 h-4 mr-2" /> Profile
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation showBreadcrumbs={true} currentPage="Messages" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">

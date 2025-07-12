@@ -4,35 +4,72 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Edit, MessageCircle, Search, Users, X } from "lucide-react";
+import { Edit, Search, X, Upload, User, Save } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
+import Navigation from "@/components/Navigation";
+
+interface ProfileData {
+  name: string;
+  bio: string;
+  location: string;
+  email: string;
+  skillsOffered: string[];
+  skillsWanted: string[];
+  isAvailable: boolean;
+  avatar_url: string;
+}
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [customSkill, setCustomSkill] = useState("");
+  const [searchQueryOffered, setSearchQueryOffered] = useState("");
+  const [searchQueryWanted, setSearchQueryWanted] = useState("");
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
-  const [filteredSkills, setFilteredSkills] = useState<string[]>([]);
-  const [profileData, setProfileData] = useState({
+  const [filteredSkillsOffered, setFilteredSkillsOffered] = useState<string[]>([]);
+  const [filteredSkillsWanted, setFilteredSkillsWanted] = useState<string[]>([]);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [customSkillOffered, setCustomSkillOffered] = useState("");
+  const [customSkillWanted, setCustomSkillWanted] = useState("");
+  const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     bio: "",
     location: "",
     email: "",
-    skillsOffered: [] as string[],
-    skillsWanted: [] as string[],
+    skillsOffered: [],
+    skillsWanted: [],
     isAvailable: false,
+    avatar_url: ""
   });
 
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    fetchProfile();
+    fetchAvailableSkills();
+  }, []);
+
+  // Filter skills based on search queries
+  useEffect(() => {
+    const filterSkills = (query: string) => {
+      if (!query.trim()) return availableSkills;
+      return availableSkills.filter(skill => 
+        skill.toLowerCase().includes(query.toLowerCase())
+      );
+    };
+
+    setFilteredSkillsOffered(filterSkills(searchQueryOffered));
+    setFilteredSkillsWanted(filterSkills(searchQueryWanted));
+  }, [searchQueryOffered, searchQueryWanted, availableSkills]);
+
+  const fetchProfile = async () => {
+    try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
 
@@ -49,234 +86,550 @@ const Profile = () => {
         return;
       }
 
-      // Parse skills from string to array if needed
-      const skillsOffered = data.skills_offered ? 
-        typeof data.skills_offered === 'string' ? data.skills_offered.split(',').map(s => s.trim()) : data.skills_offered :
-        [];
+      const parseSkills = (skills: any) => {
+        if (!skills) return [];
         
-      const skillsWanted = data.skills_wanted ? 
-        typeof data.skills_wanted === 'string' ? data.skills_wanted.split(',').map(s => s.trim()) : data.skills_wanted :
-        [];
+        // If it's a string that looks like a stringified array, parse it
+        if (typeof skills === 'string' && skills.startsWith('[') && skills.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(skills);
+            if (Array.isArray(parsed)) {
+              return parsed.filter(s => s && typeof s === 'string' && s.trim().length > 0);
+            }
+          } catch (e) {
+            console.error('Error parsing skills JSON string:', e);
+            // Fall through to other parsing methods
+          }
+        }
+        
+        // If it's a regular comma-separated string
+        if (typeof skills === 'string') {
+          return skills.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        }
+        
+        // If it's already an array
+        if (Array.isArray(skills)) {
+          return skills.filter(s => s && typeof s === 'string' && s.trim().length > 0);
+        }
+        
+        return [];
+      };
 
-      setProfileData({
+      const profileDataFromDB = {
         name: data.full_name || "",
         bio: data.bio || "",
         location: data.location || "",
         email: data.email || "",
-        skillsOffered,
-        skillsWanted,
+        skillsOffered: parseSkills(data.skills_offered),
+        skillsWanted: parseSkills(data.skills_wanted),
         isAvailable: data.is_available || false,
-      });
-    };
+        avatar_url: data.avatar_url || ""
+      };
 
-    fetchProfile();
-    fetchAvailableSkills();
-  }, []);
+      setProfileData(profileDataFromDB);
 
-  // Fetch all available skills from the database
+      // Set profile image URL from database
+      if (data.avatar_url) {
+        setProfileImageUrl(data.avatar_url);
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
+  };
+
   const fetchAvailableSkills = async () => {
-    // This is a sample list of skills - in production, you'd fetch this from your database
     const sampleSkills = [
       "React", "JavaScript", "TypeScript", "HTML", "CSS", "Node.js", "Express", 
       "Python", "Java", "C#", "PHP", "Ruby", "Swift", "Kotlin", "Flutter", 
       "React Native", "Angular", "Vue.js", "Next.js", "GraphQL", "REST API", 
       "SQL", "NoSQL", "MongoDB", "Firebase", "AWS", "Azure", "GCP", 
       "Docker", "Kubernetes", "CI/CD", "Git", "Agile", "Scrum", "UI/UX Design", 
-      "Figma", "Adobe XD", "Photoshop", "Illustrator", "T-SQL"
+      "Figma", "Adobe XD", "Photoshop", "Illustrator", "Machine Learning", 
+      "Data Science", "DevOps", "Testing", "Cybersecurity"
     ];
     
     setAvailableSkills(sampleSkills);
-    setFilteredSkills(sampleSkills);
   };
-  
-  // Filter skills based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredSkills(availableSkills);
-    } else {
-      const filtered = availableSkills.filter(skill => 
-        skill.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredSkills(filtered);
-    }
-  }, [searchQuery, availableSkills]);
 
   const handleSaveProfile = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: profileData.name,
-        bio: profileData.bio,
-        email: profileData.email,
-        location: profileData.location,
-        skills_offered: profileData.skillsOffered.join(','),
-        skills_wanted: profileData.skillsWanted.join(','),
-        is_available: profileData.isAvailable,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
-
-    if (error) {
+    if (!profileData.name.trim()) {
       toast({
-        title: "Error updating profile",
-        description: error.message,
-        variant: "destructive",
+        title: "Validation Error",
+        description: "Name is required.",
+        variant: "destructive"
       });
       return;
     }
 
+    setIsLoading(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+
+      if (!userId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      let profilePhotoUrl = profileData.avatar_url;
+      
+      // Upload profile image if selected
+      if (profileImage) {
+        try {
+          // Create a safe file name without special characters
+          const fileExt = profileImage.name.split('.').pop();
+          const timestamp = new Date().getTime(); // Add timestamp to prevent caching issues
+          const filePath = `${userId}/profile_${timestamp}.${fileExt}`;
+          
+          // Do NOT check for bucket existence from the frontend—just attempt upload
+          // If the upload fails due to missing bucket, show a clear error
+
+          
+          // Make sure the file size is reasonable (< 2MB)
+          if (profileImage.size > 2 * 1024 * 1024) {
+            toast({
+              title: "Error",
+              description: "Image size must be less than 2MB.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Upload the file with proper content type
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, profileImage, { 
+              upsert: true,
+              contentType: profileImage.type // Set the correct content type
+            });
+              
+          if (uploadError) {
+            console.error("Upload error:", uploadError);
+            // Check for missing bucket error (Supabase returns specific error codes/messages)
+            if (
+              uploadError.message?.toLowerCase().includes('bucket') &&
+              uploadError.message?.toLowerCase().includes('not found')
+            ) {
+              toast({
+                title: "Avatars Bucket Missing",
+                description: "The avatars bucket does not exist. Please ask an administrator to create it in Supabase Storage.",
+                variant: "destructive"
+              });
+            } else {
+              toast({
+                title: "Error",
+                description: "Failed to upload profile image: " + uploadError.message,
+                variant: "destructive"
+              });
+            }
+          } else {
+            // Get the public URL
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            if (urlData && urlData.publicUrl) {
+              profilePhotoUrl = urlData.publicUrl;
+              console.log("Image uploaded successfully:", profilePhotoUrl);
+            } else {
+              console.error("Failed to get public URL");
+            }
+          }
+        } catch (error) {
+          console.error("Profile image upload error:", error);
+          toast({
+            title: "Error",
+            description: "An unexpected error occurred while uploading the image.",
+            variant: "destructive"
+          });
+        }
+      }
+
+      // Ensure skills are properly formatted for database
+      const skillsOffered = Array.isArray(profileData.skillsOffered) 
+        ? profileData.skillsOffered.filter(skill => skill && typeof skill === 'string' && skill.trim().length > 0)
+        : [];
+        
+      const skillsWanted = Array.isArray(profileData.skillsWanted)
+        ? profileData.skillsWanted.filter(skill => skill && typeof skill === 'string' && skill.trim().length > 0)
+        : [];
+
+      console.log('Saving skills offered:', skillsOffered);
+      console.log('Saving skills wanted:', skillsWanted);
+
+      const { error, data } = await supabase
+        .from("profiles")
+        .update({
+          full_name: profileData.name,
+          bio: profileData.bio,
+          location: profileData.location,
+          email: profileData.email,
+          skills_offered: skillsOffered,
+          skills_wanted: skillsWanted,
+          is_available: profileData.isAvailable,
+          avatar_url: profilePhotoUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setProfileData(prev => ({ ...prev, avatar_url: profilePhotoUrl }));
+      setProfileImage(null);
+      setIsEditing(false);
+
+      toast({
+        title: "Success",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          title: "Error",
+          description: "Image size must be less than 5MB.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setProfileImage(file);
+      setProfileImageUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const addSkill = (skill: string, type: 'offered' | 'wanted') => {
+    if (!skill.trim()) return;
+    
+    const skillToAdd = skill.trim();
+    const currentSkills = type === 'offered' ? profileData.skillsOffered : profileData.skillsWanted;
+    
+    if (currentSkills.includes(skillToAdd)) return;
+
+    setProfileData(prev => ({
+      ...prev,
+      [type === 'offered' ? 'skillsOffered' : 'skillsWanted']: [...currentSkills, skillToAdd]
+    }));
+
+    // Clear search after adding
+    if (type === 'offered') {
+      setSearchQueryOffered("");
+    } else {
+      setSearchQueryWanted("");
+    }
+  };
+
+  const addCustomSkill = (type: 'offered' | 'wanted') => {
+    const customSkill = type === 'offered' ? customSkillOffered : customSkillWanted;
+    if (!customSkill.trim()) return;
+    
+    addSkill(customSkill, type);
+    
+    // Clear custom skill input
+    if (type === 'offered') {
+      setCustomSkillOffered("");
+    } else {
+      setCustomSkillWanted("");
+    }
+  };
+
+  const removeSkill = (skill: string, type: 'offered' | 'wanted') => {
+    setProfileData(prev => ({
+      ...prev,
+      [type === 'offered' ? 'skillsOffered' : 'skillsWanted']: 
+        prev[type === 'offered' ? 'skillsOffered' : 'skillsWanted'].filter(s => s !== skill)
+    }));
+  };
+
+  const moveAllSkillsToOffered = () => {
+    if (profileData.skillsWanted.length === 0) return;
+    
+    setProfileData(prev => ({
+      ...prev,
+      skillsOffered: [...new Set([...prev.skillsOffered, ...prev.skillsWanted])],
+      skillsWanted: []
+    }));
+    
     toast({
-      title: "Profile updated",
-      description: "Your profile has been successfully updated.",
+      title: "Skills Moved",
+      description: "All wanted skills have been moved to offered skills.",
     });
-    setIsEditing(false);
-  };
-  
-  // Add a skill to the offered skills list
-  const addSkillOffered = (skill: string) => {
-    if (skill.trim() !== "" && !profileData.skillsOffered.includes(skill.trim())) {
-      setProfileData(prev => ({
-        ...prev,
-        skillsOffered: [...prev.skillsOffered, skill.trim()]
-      }));
-    }
-    setSearchQuery(""); // Clear search after adding
-  };
-  
-  // Add a custom skill to the offered skills list
-  const addCustomSkillOffered = () => {
-    if (customSkill.trim() !== "" && !profileData.skillsOffered.includes(customSkill.trim())) {
-      setProfileData(prev => ({
-        ...prev,
-        skillsOffered: [...prev.skillsOffered, customSkill.trim()]
-      }));
-      setCustomSkill(""); // Clear custom skill input after adding
-    }
   };
 
-  // Remove a skill from the offered skills list
-  const removeSkillOffered = (skill: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      skillsOffered: prev.skillsOffered.filter(s => s !== skill)
-    }));
-  };
+  const SkillsSection = ({ 
+    title, 
+    skills, 
+    type, 
+    searchQuery, 
+    setSearchQuery, 
+    filteredSkills 
+  }: {
+    title: string;
+    skills: string[];
+    type: 'offered' | 'wanted';
+    searchQuery: string;
+    setSearchQuery: (query: string) => void;
+    filteredSkills: string[];
+  }) => {
+    const customSkill = type === 'offered' ? customSkillOffered : customSkillWanted;
+    const setCustomSkill = type === 'offered' ? setCustomSkillOffered : setCustomSkillWanted;
 
-  // Add a skill to the wanted skills list
-  const addSkillWanted = (skill: string) => {
-    if (!profileData.skillsWanted.includes(skill)) {
-      setProfileData(prev => ({
-        ...prev,
-        skillsWanted: [...prev.skillsWanted, skill]
-      }));
-    }
-    setSearchQuery(""); // Clear search after adding
-  };
-
-  // Remove a skill from the wanted skills list
-  const removeSkillWanted = (skill: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      skillsWanted: prev.skillsWanted.filter(s => s !== skill)
-    }));
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-medium">{title}</Label>
+          {type === 'wanted' && skills.length > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={moveAllSkillsToOffered}
+            >
+              Move All to Offered
+            </Button>
+          )}
+        </div>
+        
+        <div className="flex flex-wrap gap-2 min-h-[2rem]">
+          {skills.length > 0 ? (
+            skills.map((skill, index) => (
+              <Badge 
+                key={index} 
+                variant={type === 'offered' ? 'default' : 'outline'}
+                className="px-3 py-1 text-sm"
+              >
+                {skill}
+                <button 
+                  onClick={() => removeSkill(skill, type)} 
+                  className="ml-2 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            ))
+          ) : (
+            <span className="text-gray-500 text-sm">No skills added yet</span>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder={`Search ${type === 'offered' ? 'skills to offer' : 'skills to learn'}...`}
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setSearchQuery("")}
+            disabled={!searchQuery}
+          >
+            Clear
+          </Button>
+        </div>
+        
+        {/* Custom skill input */}
+        <div className="flex gap-2">
+          <Input
+            placeholder={`Add custom ${type === 'offered' ? 'skill to offer' : 'skill to learn'}...`}
+            value={customSkill}
+            onChange={(e) => setCustomSkill(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustomSkill(type);
+              }
+            }}
+          />
+          <Button 
+            onClick={() => addCustomSkill(type)}
+            disabled={!customSkill.trim()}
+          >
+            Add
+          </Button>
+        </div>
+        
+        {searchQuery && (
+          <div className="border rounded-md p-2 max-h-40 overflow-y-auto bg-white">
+            {filteredSkills.length > 0 ? (
+              filteredSkills.map((skill, index) => (
+                <div 
+                  key={index} 
+                  className="p-2 hover:bg-gray-50 cursor-pointer flex justify-between items-center rounded"
+                  onClick={() => addSkill(skill, type)}
+                >
+                  <span>{skill}</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    +
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="space-y-2">
+                <p className="text-center py-2 text-gray-500">No matching skills found</p>
+                {searchQuery.trim() && (
+                  <div className="text-center">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        addSkill(searchQuery, type);
+                        setSearchQuery("");
+                      }}
+                    >
+                      Add "{searchQuery}" as custom skill
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <Link to="/" className="text-xl font-bold text-gray-900">SkillSwap</Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <Link to="/messages">
-                <Button variant="ghost" size="sm">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Messages
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation showBreadcrumbs={true} currentPage="Profile" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Profile Header */}
         <Card className="mb-8">
           <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <div className="flex-1 space-y-2 mb-4 md:mb-0 md:mr-4">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Profile Image */}
+              <div className="flex-shrink-0">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200">
+                  {profileImageUrl || profileData.avatar_url ? (
+                    <img 
+                      src={profileImageUrl || profileData.avatar_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                      <User className="w-8 h-8" />
+                    </div>
+                  )}
+                  {isEditing && (
+                    <label 
+                      htmlFor="profile-upload" 
+                      className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <input 
+                        id="profile-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Profile Info */}
+              <div className="flex-1 min-w-0">
                 {isEditing ? (
-                  <>
+                  <div className="space-y-4">
                     <Input
+                      placeholder="Full Name"
                       value={profileData.name}
                       onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                      className="text-2xl font-bold"
+                      className="text-xl font-semibold"
                     />
                     <Textarea
+                      placeholder="Bio"
                       value={profileData.bio}
                       onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
                       rows={3}
+                      className="resize-none"
                     />
                     <Input
                       placeholder="Location"
                       value={profileData.location}
                       onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
                     />
-                  </>
+                    <Input
+                      placeholder="Email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
                 ) : (
-                  <>
-                    <h1 className="text-2xl font-bold text-gray-900">{profileData.name}</h1>
-                    <p className="text-gray-600">{profileData.bio}</p>
-                    <p className="text-sm text-gray-500">{profileData.location}</p>
-                    <div className="text-sm mt-1">
-                      <strong>Skills Offered:</strong>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {profileData.skillsOffered.length > 0 ? (
-                          profileData.skillsOffered.map((skill, index) => (
-                            <Badge key={index} variant="secondary">{skill}</Badge>
-                          ))
-                        ) : (
-                          <span className="text-gray-500">N/A</span>
-                        )}
-                      </div>
+                  <div className="space-y-3">
+                    <div>
+                      <h1 className="text-2xl font-bold text-gray-900">
+                        {profileData.name || "Your Name"}
+                      </h1>
+                      <p className="text-gray-600 mt-1">
+                        {profileData.bio || "Add a bio to tell others about yourself"}
+                      </p>
                     </div>
-                    <div className="text-sm mt-1">
-                      <strong>Skills Wanted:</strong>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {profileData.skillsWanted.length > 0 ? (
-                          profileData.skillsWanted.map((skill, index) => (
-                            <Badge key={index} variant="outline">{skill}</Badge>
-                          ))
-                        ) : (
-                          <span className="text-gray-500">N/A</span>
-                        )}
-                      </div>
+                    
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                      {profileData.location && (
+                        <span>📍 {profileData.location}</span>
+                      )}
+                      {profileData.email && (
+                        <span>✉️ {profileData.email}</span>
+                      )}
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        profileData.isAvailable 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {profileData.isAvailable ? 'Available' : 'Unavailable'}
+                      </span>
                     </div>
-                    <p className="text-sm mt-1"><strong>Available:</strong> {profileData.isAvailable ? "Yes" : "No"}</p>
-                  </>
+                  </div>
                 )}
               </div>
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {profileData.name?.split(" ").map(word => word[0]).join("") || "U"}
-                </div>
+
+              {/* Action Buttons */}
+              <div className="flex-shrink-0">
                 {isEditing ? (
-                  <div className="flex space-x-2">
-                    <Button onClick={handleSaveProfile}>Save</Button>
-                    <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveProfile} disabled={isLoading}>
+                      <Save className="w-4 h-4 mr-2" />
+                      {isLoading ? "Saving..." : "Save"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsEditing(false);
+                        setProfileImage(null);
+                        setProfileImageUrl(profileData.avatar_url); // Reset to saved avatar
+                        setCustomSkillOffered("");
+                        setCustomSkillWanted("");
+                        fetchProfile(); // Reset to original data
+                      }}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
                   </div>
                 ) : (
                   <Button onClick={() => setIsEditing(true)}>
@@ -289,282 +642,118 @@ const Profile = () => {
           </CardHeader>
         </Card>
 
+        {/* Tabs */}
         <Tabs defaultValue="skills" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="skills">My Skills</TabsTrigger>
-            <TabsTrigger value="learning">Learning</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="skills">Skills</TabsTrigger>
+            <TabsTrigger value="preferences">Preferences</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
+          {/* Skills Tab */}
           <TabsContent value="skills">
             <Card>
               <CardHeader>
-                <CardTitle>My Skills</CardTitle>
-                <CardDescription>Manage your skills and expertise</CardDescription>
+                <CardTitle>Skills Management</CardTitle>
+                <CardDescription>
+                  Manage your skills and what you want to learn
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Skills I Offer</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {profileData.skillsOffered.map((skill, index) => (
-                      <Badge key={index} variant="secondary" className="px-3 py-1 text-sm">
-                        {skill}
-                        <button 
-                          onClick={() => removeSkillOffered(skill)} 
-                          className="ml-2 hover:text-red-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search skills to add..."
-                        className="pl-8"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button variant="outline" onClick={() => setSearchQuery("")}>Clear</Button>
-                  </div>
-                  
-                  {searchQuery && (
-                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {filteredSkills.length > 0 ? (
-                        filteredSkills.map((skill, index) => (
-                          <div 
-                            key={index} 
-                            className="p-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
-                            onClick={() => addSkillOffered(skill)}
-                          >
-                            <span>{skill}</span>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              +
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center py-2 text-gray-500">No matching skills found</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <CardContent className="space-y-8">
+                <SkillsSection
+                  title="Skills I Offer"
+                  skills={profileData.skillsOffered}
+                  type="offered"
+                  searchQuery={searchQueryOffered}
+                  setSearchQuery={setSearchQueryOffered}
+                  filteredSkills={filteredSkillsOffered}
+                />
                 
-                <div className="space-y-4">
-                  <Label>Skills I Want to Learn</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {profileData.skillsWanted.map((skill, index) => (
-                      <Badge key={index} variant="outline" className="px-3 py-1 text-sm">
-                        {skill}
-                        <button 
-                          onClick={() => removeSkillWanted(skill)} 
-                          className="ml-2 hover:text-red-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search skills to learn..."
-                        className="pl-8"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button variant="outline" onClick={() => setSearchQuery("")}>Clear</Button>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="text-xs" 
-                      onClick={() => {
-                        // Move all skills from Skills Wanted to Skills Offered
-                        if (profileData.skillsWanted.length > 0) {
-                          setProfileData(prev => ({
-                            ...prev,
-                            skillsOffered: [...new Set([...prev.skillsOffered, ...prev.skillsWanted])],
-                            skillsWanted: []
-                          }));
-                          toast({
-                            title: "Skills Moved",
-                            description: "All skills wanted have been moved to skills offered."
-                          });
-                        }
-                      }}
-                    >
-                      Move All to Skills Offered
-                    </Button>
-                  </div>
-                  
-                  {searchQuery && (
-                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {filteredSkills.length > 0 ? (
-                        filteredSkills.map((skill, index) => (
-                          <div 
-                            key={index} 
-                            className="p-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
-                            onClick={() => addSkillWanted(skill)}
-                          >
-                            <span>{skill}</span>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              +
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center py-2 text-gray-500">No matching skills found</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <Button onClick={handleSaveProfile}>Save Skills</Button>
+                <SkillsSection
+                  title="Skills I Want to Learn"
+                  skills={profileData.skillsWanted}
+                  type="wanted"
+                  searchQuery={searchQueryWanted}
+                  setSearchQuery={setSearchQueryWanted}
+                  filteredSkills={filteredSkillsWanted}
+                />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Preferences Tab */}
+          <TabsContent value="preferences">
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferences</CardTitle>
+                <CardDescription>
+                  Configure your skill swap preferences
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="availability">Available for Skill Swaps</Label>
+                    <p className="text-sm text-gray-500">
+                      When enabled, others can see you're available for skill exchanges
+                    </p>
+                  </div>
+                  <Switch
+                    id="availability"
+                    checked={profileData.isAvailable}
+                    onCheckedChange={(checked) => 
+                      setProfileData(prev => ({ ...prev, isAvailable: checked }))
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings">
             <Card>
               <CardHeader>
                 <CardTitle>Account Settings</CardTitle>
-                <CardDescription>Manage your account info</CardDescription>
+                <CardDescription>
+                  Manage your account information
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={user?.email || profileData.email}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    value={profileData.location}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="skillsOffered">Skills Offered</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {profileData.skillsOffered.map((skill, index) => (
-                      <Badge key={index} variant="secondary" className="px-3 py-1 text-sm">
-                        {skill}
-                        <button 
-                          onClick={() => removeSkillOffered(skill)} 
-                          className="ml-2 hover:text-red-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-email">Email</Label>
+                    <Input
+                      id="settings-email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                    />
                   </div>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search skills to add..."
-                        className="pl-8"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button variant="outline" onClick={() => setSearchQuery("")}>Clear</Button>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-location">Location</Label>
+                    <Input
+                      id="settings-location"
+                      value={profileData.location}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
+                    />
                   </div>
-                  {searchQuery && (
-                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {filteredSkills.length > 0 ? (
-                        filteredSkills.map((skill, index) => (
-                          <div 
-                            key={index} 
-                            className="p-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
-                            onClick={() => addSkillOffered(skill)}
-                          >
-                            <span>{skill}</span>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              +
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center py-2 text-gray-500">No matching skills found</p>
-                      )}
-                    </div>
-                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="skillsWanted">Skills Wanted</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {profileData.skillsWanted.map((skill, index) => (
-                      <Badge key={index} variant="outline" className="px-3 py-1 text-sm">
-                        {skill}
-                        <button 
-                          onClick={() => removeSkillWanted(skill)} 
-                          className="ml-2 hover:text-red-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search skills to learn..."
-                        className="pl-8"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <Button variant="outline" onClick={() => setSearchQuery("")}>Clear</Button>
-                  </div>
-                  {searchQuery && (
-                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {filteredSkills.length > 0 ? (
-                        filteredSkills.map((skill, index) => (
-                          <div 
-                            key={index} 
-                            className="p-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
-                            onClick={() => addSkillWanted(skill)}
-                          >
-                            <span>{skill}</span>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              +
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center py-2 text-gray-500">No matching skills found</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="isAvailable"
-                    checked={profileData.isAvailable}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, isAvailable: e.target.checked }))}
-                  />
-                  <Label htmlFor="isAvailable">Available for Skill Swaps</Label>
-                </div>
-                <Button onClick={handleSaveProfile}>Save Settings</Button>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Save Button for non-editing states */}
+        {!isEditing && (
+          <div className="mt-8 flex justify-end">
+            <Button onClick={handleSaveProfile} disabled={isLoading}>
+              <Save className="w-4 h-4 mr-2" />
+              {isLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
