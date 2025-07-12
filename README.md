@@ -1,5 +1,5 @@
 # SkillSwap Platform
-
+✨ Fully Functional – No Mock Data, Real-Time Features Powered by Supabase
 **SkillSwap** is a collaborative skill-sharing platform where users can showcase their skills, connect with others, and exchange knowledge. Whether you’re a developer, designer, musician, or language enthusiast, SkillSwap helps you discover learners and teachers within your community.
 
 ---
