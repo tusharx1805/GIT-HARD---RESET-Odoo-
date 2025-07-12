@@ -19,7 +19,10 @@ const Profile = () => {
   name: "",
   bio: "",
   location: "",
-  email: ""
+  email: "",
+  skillsOffered: "",
+  skillsWanted: "",
+  isAvailable: false,
 });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -80,6 +83,7 @@ const Profile = () => {
       setIsSearching(false);
       return;
     }
+<<<<<<< Updated upstream
     
     setIsSearching(true);
     
@@ -121,6 +125,18 @@ const Profile = () => {
     setIsSearching(false);
     setSearchQuery("");
     navigate(`/user/${userId}`);
+=======
+
+    setProfileData({
+      name: data.full_name || "",
+      bio: data.bio || "",
+      location: data.location || "",
+      email: data.email || "",
+      skillsOffered: data.skills_offered || "",
+      skillsWanted: data.skills_wanted || "",
+      isAvailable: data.is_available || false,
+    });
+>>>>>>> Stashed changes
   };
 
 
@@ -175,6 +191,9 @@ const Profile = () => {
       bio: profileData.bio,
       email: profileData.email,
       location: profileData.location,
+      skills_offered: profileData.skillsOffered,
+      skills_wanted: profileData.skillsWanted,
+      is_available: profileData.isAvailable,
       updated_at: new Date().toISOString()
     })
     .eq("id", userId);
@@ -345,6 +364,15 @@ const Profile = () => {
             <h1 className="text-2xl font-bold text-gray-900">{profileData.name}</h1>
             <p className="text-gray-600">{profileData.bio}</p>
             <p className="text-sm text-gray-500">{profileData.location}</p>
+                <p className="text-sm mt-1">
+              <strong>Skills Offered:</strong> {profileData.skillsOffered || "N/A"}
+            </p>
+            <p className="text-sm mt-1">
+              <strong>Skills Wanted:</strong> {profileData.skillsWanted || "N/A"}
+            </p>
+            <p className="text-sm mt-1">
+              <strong>Available:</strong> {profileData.isAvailable ? "Yes" : "No"}
+            </p>
           </>
         )}
       </div>
@@ -512,6 +540,34 @@ const Profile = () => {
                       onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
                     />
                   </div>
+                    <div className="space-y-2">
+                  <Label htmlFor="skillsOffered">Skills Offered</Label>
+                  <Textarea
+                    id="skillsOffered"
+                    value={profileData.skillsOffered}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, skillsOffered: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="skillsWanted">Skills Wanted</Label>
+                  <Textarea
+                    id="skillsWanted"
+                    value={profileData.skillsWanted}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, skillsWanted: e.target.value }))}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isAvailable"
+                    checked={profileData.isAvailable}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, isAvailable: e.target.checked }))}
+                  />
+                  <Label htmlFor="isAvailable">Available for Skill Swaps</Label>
+                </div>
+
                   <Button onClick={handleSaveProfile}>Save Settings</Button>
                 </CardContent>
               </Card>
