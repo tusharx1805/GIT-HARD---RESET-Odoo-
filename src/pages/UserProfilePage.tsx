@@ -20,7 +20,6 @@ const UserProfilePage = () => {
     isAvailable: false,
     createdAt: "",
     updatedAt: "",
-    userId: "",
     skills: "",
     rawData: {} as any, // Store the raw profile data for displaying all fields
   });
@@ -91,7 +90,6 @@ const UserProfilePage = () => {
           isAvailable: data.is_available || false,
           createdAt: data.created_at || "",
           updatedAt: data.updated_at || "",
-          userId: data.id || "",
           skills,
           rawData: data, // Store raw data to display all fields
         });
