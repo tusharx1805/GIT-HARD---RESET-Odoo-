@@ -1,29 +1,58 @@
-
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "react-router-dom";
-import { Users, User, Star, Edit, Plus, Trash2, MessageCircle, ArrowLeft } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 import UserProfile from "@/components/UserProfile";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { ArrowLeft, Edit, MessageCircle, Plus, Star, Trash2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: "John Doe",
-    bio: "Passionate web developer and designer with 5+ years of experience. Love teaching and learning new skills!",
-    location: "San Francisco, CA",
-    email: "john.doe@example.com"
-  });
+  name: "",
+  bio: "",
+  location: "",
+  email: ""
+});
 
   const { toast } = useToast();
   const { user } = useAuth();
+  useEffect(() => {
+  const fetchProfile = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Failed to fetch profile:", error);
+      return;
+    }
+
+    setProfileData({
+      name: data.full_name || "",
+      bio: data.bio || "",
+      location: data.location || "",
+      email: data.email || "",
+    });
+  };
+
+  fetchProfile();
+}, []);
+
 
   const mySkills = [
     {
@@ -65,13 +94,37 @@ const Profile = () => {
     }
   ];
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      full_name: profileData.name,
+      bio: profileData.bio,
+      email: profileData.email,
+      location: profileData.location,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", userId);
+
+  if (error) {
     toast({
-      title: "Profile updated",
-      description: "Your profile has been successfully updated.",
+      title: "Error updating profile",
+      description: error.message,
+      variant: "destructive",
     });
-    setIsEditing(false);
-  };
+    return;
+  }
+
+  toast({
+    title: "Profile updated",
+    description: "Your profile has been successfully updated.",
+  });
+  setIsEditing(false);
+};
+
 
   const handleAddSkill = () => {
     toast({
@@ -113,52 +166,84 @@ const Profile = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
         <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  JD
-                </div>
-                <div>
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Input
-                        value={profileData.name}
-                        onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                        className="text-2xl font-bold"
-                      />
-                      <Textarea
-                        value={profileData.bio}
-                        onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
-                        rows={3}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <h1 className="text-2xl font-bold text-gray-900">{profileData.name}</h1>
-                      <p className="text-gray-600 mt-1">{profileData.bio}</p>
-                      <p className="text-sm text-gray-500 mt-2">{profileData.location}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                {isEditing ? (
-                  <>
-                    <Button onClick={handleSaveProfile}>Save Changes</Button>
-                    <Button variant="outline" onClick={() => setIsEditing(false)}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button onClick={() => setIsEditing(true)}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
+          <Card className="mb-8">
+  <CardHeader>
+    {/* Top Row: Search + Buttons */}
+    <div className="flex justify-between items-center mb-4">
+      <Input
+        placeholder="Search users..."
+        className="w-1/3"
+        // Optional: Add onChange logic here
+      />
+      <div className="flex items-center space-x-4">
+        <Link to="/dashboard">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
+        <Link to="/messages">
+          <Button variant="ghost" size="sm">
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Messages
+          </Button>
+        </Link>
+      </div>
+    </div>
+
+    {/* Profile Info Row */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+      {/* Left Side: Text Details */}
+      <div className="flex-1 space-y-2 mb-4 md:mb-0 md:mr-4">
+        {isEditing ? (
+          <>
+            <Input
+              value={profileData.name}
+              onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+              className="text-2xl font-bold"
+            />
+            <Textarea
+              value={profileData.bio}
+              onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+              rows={3}
+            />
+            <Input
+              placeholder="Location"
+              value={profileData.location}
+              onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
+            />
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900">{profileData.name}</h1>
+            <p className="text-gray-600">{profileData.bio}</p>
+            <p className="text-sm text-gray-500">{profileData.location}</p>
+          </>
+        )}
+      </div>
+
+      {/* Right Side: Profile Circle + Buttons */}
+      <div className="flex flex-col items-center space-y-2">
+        <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+          {profileData.name?.split(" ").map(word => word[0]).join("") || "U"}
+        </div>
+
+        {isEditing ? (
+          <div className="flex space-x-2">
+            <Button onClick={handleSaveProfile}>Save</Button>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+          </div>
+        ) : (
+          <Button onClick={() => setIsEditing(true)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Profile
+          </Button>
+        )}
+      </div>
+    </div>
+  </CardHeader>
+</Card>
+
         </Card>
 
         {/* Profile Content */}
@@ -300,7 +385,7 @@ const Profile = () => {
                       onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
                     />
                   </div>
-                  <Button>Save Settings</Button>
+                  <Button onClick={handleSaveProfile}>Save Settings</Button>
                 </CardContent>
               </Card>
 
