@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 import plugin from 'tailwindcss/plugin';
 
-export default {
+const config = {
   darkMode: ["class"],
   content: [
     './pages/**/*.{ts,tsx}',
@@ -216,9 +216,9 @@ export default {
         '.focus-ring': {
           'outline': 'none',
           '&:focus': {
-            'ring': '2px',
+            'ringWidth': '2px',
             'ringColor': 'hsl(var(--accent))',
-            'ringOffset': '2px',
+            'ringOffsetWidth': '2px',
           },
         },
         '.float-animation': {
@@ -232,4 +232,4 @@ export default {
   ],
 } satisfies Config;
 
-export type { Config };
+export default config;

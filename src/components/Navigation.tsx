@@ -125,22 +125,22 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
   ];
 
   return (
-    <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
+    <header className="glass-primary sticky top-0 z-10 backdrop-blur-xl">
+      <div className="container-windsurf mx-auto">
+        <div className="flex justify-between items-center py-4 relative">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 glass-accent rounded-lg flex items-center justify-center float-animation">
+                <Users className="w-5 h-5 text-accent-foreground" />
               </div>
-              <Link to="/" className="text-xl font-semibold text-slate-900">SkillSwap Platform</Link>
+              <Link to="/" className="text-xl font-medium text-heading hover:text-accent transition-colors duration-200">SkillSwap Platform</Link>
             </div>
             
             {showBreadcrumbs && (
-              <div className="hidden sm:flex items-center space-x-2 text-sm text-slate-600">
-                <Link to="/dashboard" className="hover:text-slate-900">Home</Link>
-                <span>/</span>
-                <span>{currentPage}</span>
+              <div className="hidden sm:flex items-center space-x-2 text-sm text-body">
+                <Link to="/dashboard" className="hover:text-accent transition-colors duration-200">Home</Link>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-heading">{currentPage}</span>
               </div>
             )}
           </div>
@@ -153,12 +153,12 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
                   <Button 
                     variant={location.pathname === item.path ? "default" : "ghost"} 
                     size="sm" 
-                    className="relative text-slate-600 hover:text-slate-900"
+                    className={`relative ${location.pathname === item.path ? 'glass-accent text-accent-foreground' : 'glass-secondary text-body hover:text-heading'} focus-ring`}
                   >
                     {item.icon}
                     {item.name}
                     {item.badge && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
                         {item.badge}
                       </span>
                     )}
@@ -168,7 +168,7 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-slate-600 hover:text-slate-900" 
+                className="glass-primary text-body hover:text-heading focus-ring" 
                 onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4 mr-2" />
@@ -178,8 +178,8 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center overflow-hidden">
+                <Button variant="ghost" className="relative h-12 w-12 rounded-full glass-secondary focus-ring">
+                  <div className="w-10 h-10 glass-accent rounded-full flex items-center justify-center overflow-hidden">
                     {currentUser?.avatar_url ? (
                       <img 
                         src={currentUser.avatar_url} 
@@ -187,12 +187,12 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User className="w-5 h-5 text-slate-600" />
+                      <User className="w-5 h-5 text-accent-foreground" />
                     )}
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="glass-primary border-none p-2 shadow-lg">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/profile')}>
