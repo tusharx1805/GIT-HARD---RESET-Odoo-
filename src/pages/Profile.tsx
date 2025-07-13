@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Edit, Search, X, Upload, User, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react"; // Import useMemo
 import Navigation from "@/components/Navigation";
 
 interface ProfileData {
@@ -26,11 +26,11 @@ interface ProfileData {
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
+  // Keep search queries as local state
   const [searchQueryOffered, setSearchQueryOffered] = useState("");
   const [searchQueryWanted, setSearchQueryWanted] = useState("");
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
-  const [filteredSkillsOffered, setFilteredSkillsOffered] = useState<string[]>([]);
-  const [filteredSkillsWanted, setFilteredSkillsWanted] = useState<string[]>([]);
+  // filteredSkills will be derived inside SkillsSection
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,18 +55,8 @@ const Profile = () => {
     fetchAvailableSkills();
   }, []);
 
-  // Filter skills based on search queries
-  useEffect(() => {
-    const filterSkills = (query: string) => {
-      if (!query.trim()) return availableSkills;
-      return availableSkills.filter(skill => 
-        skill.toLowerCase().includes(query.toLowerCase())
-      );
-    };
-
-    setFilteredSkillsOffered(filterSkills(searchQueryOffered));
-    setFilteredSkillsWanted(filterSkills(searchQueryWanted));
-  }, [searchQueryOffered, searchQueryWanted, availableSkills]);
+  // Removed the filtering useEffect here.
+  // The filtering will now happen within the SkillsSection component itself using useMemo.
 
   const fetchProfile = async () => {
     try {
@@ -88,7 +78,7 @@ const Profile = () => {
 
       const parseSkills = (skills: any) => {
         if (!skills) return [];
-        
+
         // If it's a string that looks like a stringified array, parse it
         if (typeof skills === 'string' && skills.startsWith('[') && skills.endsWith(']')) {
           try {
@@ -101,17 +91,17 @@ const Profile = () => {
             // Fall through to other parsing methods
           }
         }
-        
+
         // If it's a regular comma-separated string
         if (typeof skills === 'string') {
           return skills.split(',').map(s => s.trim()).filter(s => s.length > 0);
         }
-        
+
         // If it's already an array
         if (Array.isArray(skills)) {
           return skills.filter(s => s && typeof s === 'string' && s.trim().length > 0);
         }
-        
+
         return [];
       };
 
@@ -139,15 +129,15 @@ const Profile = () => {
 
   const fetchAvailableSkills = async () => {
     const sampleSkills = [
-      "React", "JavaScript", "TypeScript", "HTML", "CSS", "Node.js", "Express", 
-      "Python", "Java", "C#", "PHP", "Ruby", "Swift", "Kotlin", "Flutter", 
-      "React Native", "Angular", "Vue.js", "Next.js", "GraphQL", "REST API", 
-      "SQL", "NoSQL", "MongoDB", "Firebase", "AWS", "Azure", "GCP", 
-      "Docker", "Kubernetes", "CI/CD", "Git", "Agile", "Scrum", "UI/UX Design", 
-      "Figma", "Adobe XD", "Photoshop", "Illustrator", "Machine Learning", 
+      "React", "JavaScript", "TypeScript", "HTML", "CSS", "Node.js", "Express",
+      "Python", "Java", "C#", "PHP", "Ruby", "Swift", "Kotlin", "Flutter",
+      "React Native", "Angular", "Vue.js", "Next.js", "GraphQL", "REST API",
+      "SQL", "NoSQL", "MongoDB", "Firebase", "AWS", "Azure", "GCP",
+      "Docker", "Kubernetes", "CI/CD", "Git", "Agile", "Scrum", "UI/UX Design",
+      "Figma", "Adobe XD", "Photoshop", "Illustrator", "Machine Learning",
       "Data Science", "DevOps", "Testing", "Cybersecurity"
     ];
-    
+
     setAvailableSkills(sampleSkills);
   };
 
@@ -176,7 +166,7 @@ const Profile = () => {
       }
 
       let profilePhotoUrl = profileData.avatar_url;
-      
+
       // Upload profile image if selected
       if (profileImage) {
         try {
@@ -184,11 +174,7 @@ const Profile = () => {
           const fileExt = profileImage.name.split('.').pop();
           const timestamp = new Date().getTime(); // Add timestamp to prevent caching issues
           const filePath = `${userId}/profile_${timestamp}.${fileExt}`;
-          
-          // Do NOT check for bucket existence from the frontend—just attempt upload
-          // If the upload fails due to missing bucket, show a clear error
 
-          
           // Make sure the file size is reasonable (< 2MB)
           if (profileImage.size > 2 * 1024 * 1024) {
             toast({
@@ -198,15 +184,15 @@ const Profile = () => {
             });
             return;
           }
-          
+
           // Upload the file with proper content type
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, profileImage, { 
+            .upload(filePath, profileImage, {
               upsert: true,
               contentType: profileImage.type // Set the correct content type
             });
-              
+
           if (uploadError) {
             console.error("Upload error:", uploadError);
             // Check for missing bucket error (Supabase returns specific error codes/messages)
@@ -247,10 +233,10 @@ const Profile = () => {
       }
 
       // Ensure skills are properly formatted for database
-      const skillsOffered = Array.isArray(profileData.skillsOffered) 
+      const skillsOffered = Array.isArray(profileData.skillsOffered)
         ? profileData.skillsOffered.filter(skill => skill && typeof skill === 'string' && skill.trim().length > 0)
         : [];
-        
+
       const skillsWanted = Array.isArray(profileData.skillsWanted)
         ? profileData.skillsWanted.filter(skill => skill && typeof skill === 'string' && skill.trim().length > 0)
         : [];
@@ -309,7 +295,7 @@ const Profile = () => {
         });
         return;
       }
-      
+
       setProfileImage(file);
       setProfileImageUrl(URL.createObjectURL(file));
     }
@@ -317,10 +303,10 @@ const Profile = () => {
 
   const addSkill = (skill: string, type: 'offered' | 'wanted') => {
     if (!skill.trim()) return;
-    
+
     const skillToAdd = skill.trim();
     const currentSkills = type === 'offered' ? profileData.skillsOffered : profileData.skillsWanted;
-    
+
     if (currentSkills.includes(skillToAdd)) return;
 
     setProfileData(prev => ({
@@ -339,9 +325,9 @@ const Profile = () => {
   const addCustomSkill = (type: 'offered' | 'wanted') => {
     const customSkill = type === 'offered' ? customSkillOffered : customSkillWanted;
     if (!customSkill.trim()) return;
-    
+
     addSkill(customSkill, type);
-    
+
     // Clear custom skill input
     if (type === 'offered') {
       setCustomSkillOffered("");
@@ -353,51 +339,71 @@ const Profile = () => {
   const removeSkill = (skill: string, type: 'offered' | 'wanted') => {
     setProfileData(prev => ({
       ...prev,
-      [type === 'offered' ? 'skillsOffered' : 'skillsWanted']: 
+      [type === 'offered' ? 'skillsOffered' : 'skillsWanted']:
         prev[type === 'offered' ? 'skillsOffered' : 'skillsWanted'].filter(s => s !== skill)
     }));
   };
 
   const moveAllSkillsToOffered = () => {
     if (profileData.skillsWanted.length === 0) return;
-    
+
     setProfileData(prev => ({
       ...prev,
       skillsOffered: [...new Set([...prev.skillsOffered, ...prev.skillsWanted])],
       skillsWanted: []
     }));
-    
+
     toast({
       title: "Skills Moved",
       description: "All wanted skills have been moved to offered skills.",
     });
   };
 
-  const SkillsSection = ({ 
-    title, 
-    skills, 
-    type, 
-    searchQuery, 
-    setSearchQuery, 
-    filteredSkills 
+  const SkillsSection = ({
+    title,
+    skills,
+    type,
+    // Remove searchQuery and filteredSkills from props if you manage them locally
   }: {
     title: string;
     skills: string[];
     type: 'offered' | 'wanted';
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
-    filteredSkills: string[];
   }) => {
+    // Manage search query state locally within SkillsSection
+    const [localSearchQuery, setLocalSearchQuery] = useState("");
     const customSkill = type === 'offered' ? customSkillOffered : customSkillWanted;
     const setCustomSkill = type === 'offered' ? setCustomSkillOffered : setCustomSkillWanted;
+
+    // Use useMemo to filter skills based on localSearchQuery and availableSkills
+    const filteredSkills = useMemo(() => {
+      if (!localSearchQuery.trim()) return availableSkills;
+      return availableSkills.filter(skill =>
+        skill.toLowerCase().includes(localSearchQuery.toLowerCase())
+      );
+    }, [localSearchQuery, availableSkills]);
+
+    // Handle adding skills, clearing local search query
+    const handleAddSkill = (skill: string) => {
+      addSkill(skill, type); // Use the addSkill from parent
+      setLocalSearchQuery(""); // Clear the local search query
+    };
+
+    const handleAddCustomSkill = () => {
+      const currentCustomSkill = type === 'offered' ? customSkillOffered : customSkillWanted;
+      if (!currentCustomSkill.trim()) return;
+
+      addSkill(currentCustomSkill, type);
+      setCustomSkill(""); // Clear custom skill input
+    };
+
 
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label className="text-base font-medium">{title}</Label>
           {type === 'wanted' && skills.length > 0 && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={moveAllSkillsToOffered}
             >
@@ -405,18 +411,18 @@ const Profile = () => {
             </Button>
           )}
         </div>
-        
+
         <div className="flex flex-wrap gap-2 min-h-[2rem]">
           {skills.length > 0 ? (
             skills.map((skill, index) => (
-              <Badge 
-                key={index} 
+              <Badge
+                key={index}
                 variant={type === 'offered' ? 'default' : 'outline'}
                 className="px-3 py-1 text-sm"
               >
                 {skill}
-                <button 
-                  onClick={() => removeSkill(skill, type)} 
+                <button
+                  onClick={() => removeSkill(skill, type)}
                   className="ml-2 hover:text-red-500 transition-colors"
                 >
                   <X className="w-3 h-3" />
@@ -427,26 +433,26 @@ const Profile = () => {
             <span className="text-gray-500 text-sm">No skills added yet</span>
           )}
         </div>
-        
+
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <Input
               placeholder={`Search ${type === 'offered' ? 'skills to offer' : 'skills to learn'}...`}
               className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={localSearchQuery} // Use local search query
+              onChange={(e) => setLocalSearchQuery(e.target.value)} // Update local search query
             />
           </div>
-          <Button 
-            variant="outline" 
-            onClick={() => setSearchQuery("")}
-            disabled={!searchQuery}
+          <Button
+            variant="outline"
+            onClick={() => setLocalSearchQuery("")} // Clear local search query
+            disabled={!localSearchQuery}
           >
             Clear
           </Button>
         </div>
-        
+
         {/* Custom skill input */}
         <div className="flex gap-2">
           <Input
@@ -456,26 +462,26 @@ const Profile = () => {
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                addCustomSkill(type);
+                handleAddCustomSkill(); // Use the local handler
               }
             }}
           />
-          <Button 
-            onClick={() => addCustomSkill(type)}
+          <Button
+            onClick={handleAddCustomSkill} // Use the local handler
             disabled={!customSkill.trim()}
           >
             Add
           </Button>
         </div>
-        
-        {searchQuery && (
+
+        {localSearchQuery && ( // Show filtered results only if there's a local search query
           <div className="border rounded-md p-2 max-h-40 overflow-y-auto bg-white">
             {filteredSkills.length > 0 ? (
               filteredSkills.map((skill, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="p-2 hover:bg-gray-50 cursor-pointer flex justify-between items-center rounded"
-                  onClick={() => addSkill(skill, type)}
+                  onClick={() => handleAddSkill(skill)} // Use the local handler
                 >
                   <span>{skill}</span>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -486,17 +492,16 @@ const Profile = () => {
             ) : (
               <div className="space-y-2">
                 <p className="text-center py-2 text-gray-500">No matching skills found</p>
-                {searchQuery.trim() && (
+                {localSearchQuery.trim() && (
                   <div className="text-center">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => {
-                        addSkill(searchQuery, type);
-                        setSearchQuery("");
+                        handleAddSkill(localSearchQuery); // Add the custom skill if no match
                       }}
                     >
-                      Add "{searchQuery}" as custom skill
+                      Add "{localSearchQuery}" as custom skill
                     </Button>
                   </div>
                 )}
@@ -521,9 +526,9 @@ const Profile = () => {
               <div className="flex-shrink-0">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200">
                   {profileImageUrl || profileData.avatar_url ? (
-                    <img 
-                      src={profileImageUrl || profileData.avatar_url} 
-                      alt="Profile" 
+                    <img
+                      src={profileImageUrl || profileData.avatar_url}
+                      alt="Profile"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -532,12 +537,12 @@ const Profile = () => {
                     </div>
                   )}
                   {isEditing && (
-                    <label 
-                      htmlFor="profile-upload" 
+                    <label
+                      htmlFor="profile-upload"
                       className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
                     >
                       <Upload className="w-4 h-4" />
-                      <input 
+                      <input
                         id="profile-upload"
                         type="file"
                         accept="image/*"
@@ -588,7 +593,7 @@ const Profile = () => {
                         {profileData.bio || "Add a bio to tell others about yourself"}
                       </p>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                       {profileData.location && (
                         <span>📍 {profileData.location}</span>
@@ -597,8 +602,8 @@ const Profile = () => {
                         <span>✉️ {profileData.email}</span>
                       )}
                       <span className={`px-2 py-1 rounded-full text-xs ${
-                        profileData.isAvailable 
-                          ? 'bg-green-100 text-green-800' 
+                        profileData.isAvailable
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-600'
                       }`}>
                         {profileData.isAvailable ? 'Available' : 'Unavailable'}
@@ -616,8 +621,8 @@ const Profile = () => {
                       <Save className="w-4 h-4 mr-2" />
                       {isLoading ? "Saving..." : "Save"}
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setIsEditing(false);
                         setProfileImage(null);
@@ -664,18 +669,14 @@ const Profile = () => {
                   title="Skills I Offer"
                   skills={profileData.skillsOffered}
                   type="offered"
-                  searchQuery={searchQueryOffered}
-                  setSearchQuery={setSearchQueryOffered}
-                  filteredSkills={filteredSkillsOffered}
+                  // Removed searchQuery, setSearchQuery, filteredSkills props
                 />
-                
+
                 <SkillsSection
                   title="Skills I Want to Learn"
                   skills={profileData.skillsWanted}
                   type="wanted"
-                  searchQuery={searchQueryWanted}
-                  setSearchQuery={setSearchQueryWanted}
-                  filteredSkills={filteredSkillsWanted}
+                  // Removed searchQuery, setSearchQuery, filteredSkills props
                 />
               </CardContent>
             </Card>
@@ -701,7 +702,7 @@ const Profile = () => {
                   <Switch
                     id="availability"
                     checked={profileData.isAvailable}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setProfileData(prev => ({ ...prev, isAvailable: checked }))
                     }
                   />
@@ -730,7 +731,7 @@ const Profile = () => {
                       onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="settings-location">Location</Label>
                     <Input
