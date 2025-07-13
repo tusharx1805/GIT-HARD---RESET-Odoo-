@@ -1,4 +1,4 @@
-// messages.tsx (FULL LENGTH with real-time Supabase chat)
+// messages.tsx (FIXED - correct timestamp handling and chat preview)
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
@@ -16,70 +16,76 @@ import {
   ArrowLeft,
   Loader2,
 } from "lucide-react";
-import Navigation from "@/components/Navigation";
 
 const Messages = () => {
   const [user, setUser] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [allMessages, setAllMessages] = useState<any[]>([]); // Store all messages for chat previews
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   useEffect(() => scrollToBottom(), [messages]);
 
-  // Load user
   useEffect(() => {
     const getUser = async () => {
       const {
         data: { user },
-        error,
       } = await supabase.auth.getUser();
       if (user) setUser(user);
     };
     getUser();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load all users
   useEffect(() => {
     if (!user?.id) return;
     const fetchUsers = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("id, full_name")
         .neq("id", user.id);
-      if (!error) setUsers(data || []);
+      setUsers(data || []);
     };
     fetchUsers();
   }, [user?.id]);
 
-  // Load and subscribe to messages
+  // Fetch all messages for chat previews
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchAllMessages = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order("timestamp", { ascending: true }); // Use correct column name
+      setAllMessages(data || []);
+    };
+    fetchAllMessages();
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user?.id || !selectedChat?.id) return;
     const fetchMessages = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("messages")
         .select("*")
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedChat.id}),and(sender_id.eq.${selectedChat.id},receiver_id.eq.${user.id})`)
-        .order("created_at", { ascending: true });
-
-      if (!error) setMessages(data || []);
+        .order("timestamp", { ascending: true }); // Use correct column name
+      setMessages(data || []);
       setIsLoading(false);
     };
     fetchMessages();
@@ -96,6 +102,7 @@ const Messages = () => {
             (msg.sender_id === selectedChat.id && msg.receiver_id === user.id)
           ) {
             setMessages((prev) => [...prev, msg]);
+            setAllMessages((prev) => [...prev, msg]); // Update all messages too
           }
         }
       )
@@ -122,19 +129,36 @@ const Messages = () => {
 
     if (!error && data) {
       setMessages((prev) => [...prev, data]);
+      setAllMessages((prev) => [...prev, data]); // Update all messages too
       setNewMessage("");
-    } else {
-      console.error(error);
     }
     setIsSending(false);
   };
 
-  const filteredUsers = users.filter((u) =>
+  // Fixed filtering logic using allMessages instead of messages
+  const filteredUsers = users.map((u) => {
+    const history = allMessages.filter(
+      (m) =>
+        (m.sender_id === u.id && m.receiver_id === user?.id) ||
+        (m.sender_id === user?.id && m.receiver_id === u.id)
+    );
+    const lastMessage = history.slice(-1)[0];
+    return { ...u, lastMessage };
+  }).filter((u) =>
     u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // Fixed formatTime function with better error handling
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -188,25 +212,22 @@ const Messages = () => {
                   <div
                     key={u.id}
                     onClick={() => setSelectedChat(u)}
-                    className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${
-                      selectedChat?.id === u.id ? "bg-blue-50 border-r-2 border-r-blue-500" : ""
-                    }`}
+                    className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${selectedChat?.id === u.id ? "bg-blue-50 border-r-2 border-r-blue-500" : ""}`}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                        {u.full_name
-                          ?.split(" ")
-                          .map((n: string) => n[0])
-                          .join("")
-                          .slice(0, 2) || "?"}
+                        {u.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-semibold text-gray-900 truncate">
                           {u.full_name || "Unknown User"}
                         </h3>
-                        <Badge variant="outline" className="text-xs mt-1">
-                          Tap to message
-                        </Badge>
+                        <p className="text-xs text-gray-500 truncate">
+                          {u.lastMessage?.message || "No messages yet"}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {u.lastMessage?.timestamp ? formatTime(u.lastMessage.timestamp) : ""}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -215,18 +236,13 @@ const Messages = () => {
             </Card>
           </div>
 
-          {/* Chat Area */}
           <div className="lg:col-span-2">
             {selectedChat ? (
               <Card className="h-full flex flex-col">
                 <CardHeader className="border-b">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      {selectedChat.full_name
-                        ?.split(" ")
-                        .map((n: string) => n[0])
-                        .join("")
-                        .slice(0, 2) || "?"}
+                      {selectedChat.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "?"}
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{selectedChat.full_name}</h3>
@@ -255,7 +271,7 @@ const Messages = () => {
                         >
                           <p className="text-sm">{msg.message}</p>
                           <p className="text-xs mt-1 text-right opacity-60">
-                            {formatTime(msg.created_at)}
+                            {formatTime(msg.timestamp)}
                           </p>
                         </div>
                       </div>
