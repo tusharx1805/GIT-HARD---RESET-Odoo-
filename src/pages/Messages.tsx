@@ -1,4 +1,4 @@
-// messages.tsx (FIXED - Proper chat layout, scrolling, and notifications)
+// messages.tsx (ENHANCED - Wider chat grid layout)
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
@@ -368,9 +368,10 @@ const Messages = () => {
         </div>
       </header>
 
-      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex h-0">
-        <div className="grid lg:grid-cols-3 gap-6 w-full h-full">
-          <div className="lg:col-span-1">
+     <div className="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 flex h-0">
+        <div className="grid lg:grid-cols-12 gap-6 w-full h-full">
+          {/* Chat Users List - Now takes 4 columns instead of 3 for more width */}
+          <div className="lg:col-span-4">
             <Card className="h-full flex flex-col">
               <CardHeader className="flex-shrink-0 pb-4">
                 <CardTitle className="flex items-center justify-between">
@@ -516,7 +517,8 @@ const Messages = () => {
             </Card>
           </div>
 
-          <div className="lg:col-span-2">
+          {/* Chat Area - Now takes 8 columns instead of 6 for much more width */}
+          <div className="lg:col-span-8">
             {selectedChat ? (
               <Card className="h-full flex flex-col">
                 <CardHeader className="border-b flex-shrink-0 bg-gradient-to-r from-blue-50 to-blue-100">
@@ -574,7 +576,7 @@ const Messages = () => {
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <div
-                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md ${
+                          className={`max-w-lg lg:max-w-2xl px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md ${
                             msg.sender_id === user?.id
                               ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white ml-auto"
                               : "bg-white text-gray-900 border border-gray-200"
