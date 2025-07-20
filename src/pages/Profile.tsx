@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Edit, Search, X, Upload, User, Save } from "lucide-react";
+import { Edit, Search, X, Upload, User, Save, Github, Linkedin, Phone, ExternalLink } from "lucide-react";
 import { useEffect, useState, useMemo } from "react"; // Import useMemo
 import Navigation from "@/components/Navigation";
 import { useCallback } from "react";
@@ -23,6 +23,9 @@ interface ProfileData {
   skillsWanted: string[];
   isAvailable: boolean;
   avatar_url: string;
+  github_url: string;
+  linkedin_url: string;
+  phone_number: string;
 }
 
 const Profile = () => {
@@ -45,7 +48,10 @@ const Profile = () => {
     skillsOffered: [],
     skillsWanted: [],
     isAvailable: false,
-    avatar_url: ""
+    avatar_url: "",
+    github_url: "",
+    linkedin_url: "",
+    phone_number: ""
   });
   const handleOfferedSkillsChange = useCallback(
     (skills: string[]) => {
@@ -61,7 +67,6 @@ const Profile = () => {
     []
   );
 
-
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -69,6 +74,43 @@ const Profile = () => {
     fetchProfile();
     fetchAvailableSkills();
   }, []);
+
+  // Helper function to validate and format URLs
+  const formatUrl = (url: string, platform: string): string => {
+    if (!url) return "";
+    
+    // Remove any whitespace
+    url = url.trim();
+    
+    // If it's already a complete URL, return as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    // Format GitHub URLs
+    if (platform === 'github') {
+      if (url.startsWith('github.com/')) {
+        return `https://${url}`;
+      } else if (url.startsWith('/')) {
+        return `https://github.com${url}`;
+      } else {
+        return `https://github.com/${url}`;
+      }
+    }
+    
+    // Format LinkedIn URLs
+    if (platform === 'linkedin') {
+      if (url.startsWith('linkedin.com/')) {
+        return `https://${url}`;
+      } else if (url.startsWith('/in/') || url.startsWith('/company/')) {
+        return `https://linkedin.com${url}`;
+      } else {
+        return `https://linkedin.com/in/${url}`;
+      }
+    }
+    
+    return url;
+  };
 
   // Removed the filtering useEffect here.
   // The filtering will now happen within the SkillsSection component itself using useMemo.
@@ -128,7 +170,10 @@ const Profile = () => {
         skillsOffered: parseSkills(data.skills_offered),
         skillsWanted: parseSkills(data.skills_wanted),
         isAvailable: data.is_available || false,
-        avatar_url: data.avatar_url || ""
+        avatar_url: data.avatar_url || "",
+        github_url: data.github_url || "",
+        linkedin_url: data.linkedin_url || "",
+        phone_number: data.phone_number || ""
       };
 
       setProfileData(profileDataFromDB);
@@ -270,6 +315,9 @@ const Profile = () => {
           skills_wanted: skillsWanted,
           is_available: profileData.isAvailable,
           avatar_url: profilePhotoUrl,
+          github_url: profileData.github_url,
+          linkedin_url: profileData.linkedin_url,
+          phone_number: profileData.phone_number,
           updated_at: new Date().toISOString(),
         })
         .eq("id", userId)
@@ -413,7 +461,6 @@ const Profile = () => {
       setCustomSkill(""); // Clear custom skill input
     };
 
-
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -529,6 +576,105 @@ const Profile = () => {
       </div>
     );
   };
+
+  const SocialLinksSection = () => (
+    <div className="space-y-4">
+      <Label className="text-base font-medium">Social Links</Label>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* GitHub */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2 text-sm">
+            <Github className="w-4 h-4" />
+            GitHub
+          </Label>
+          {isEditing ? (
+            <Input
+              placeholder="github.com/username or username"
+              value={profileData.github_url}
+              onChange={(e) => setProfileData(prev => ({ ...prev, github_url: e.target.value }))}
+            />
+          ) : (
+            <div className="min-h-[2.5rem] flex items-center">
+              {profileData.github_url ? (
+                <a
+                  href={formatUrl(profileData.github_url, 'github')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                >
+                  <Github className="w-4 h-4" />
+                  {profileData.github_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-gray-500 text-sm">Not provided</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* LinkedIn */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2 text-sm">
+            <Linkedin className="w-4 h-4" />
+            LinkedIn
+          </Label>
+          {isEditing ? (
+            <Input
+              placeholder="linkedin.com/in/username or username"
+              value={profileData.linkedin_url}
+              onChange={(e) => setProfileData(prev => ({ ...prev, linkedin_url: e.target.value }))}
+            />
+          ) : (
+            <div className="min-h-[2.5rem] flex items-center">
+              {profileData.linkedin_url ? (
+                <a
+                  href={formatUrl(profileData.linkedin_url, 'linkedin')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                >
+                  <Linkedin className="w-4 h-4" />
+                  {profileData.linkedin_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span className="text-gray-500 text-sm">Not provided</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Phone Number */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2 text-sm">
+            <Phone className="w-4 h-4" />
+            Phone Number
+          </Label>
+          {isEditing ? (
+            <Input
+              placeholder="+1 (555) 123-4567"
+              type="tel"
+              value={profileData.phone_number}
+              onChange={(e) => setProfileData(prev => ({ ...prev, phone_number: e.target.value }))}
+            />
+          ) : (
+            <div className="min-h-[2.5rem] flex items-center">
+              {profileData.phone_number ? (
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Phone className="w-4 h-4" />
+                  {profileData.phone_number}
+                </div>
+              ) : (
+                <span className="text-gray-500 text-sm">Not provided</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -664,67 +810,96 @@ const Profile = () => {
           </CardHeader>
         </Card>
 
+        {/* Social Links Card (Always visible) */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="w-5 h-5" />
+              Connect with Me
+            </CardTitle>
+            <CardDescription>
+              Share your social links to make it easy for others to connect
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SocialLinksSection />
+          </CardContent>
+        </Card>
+
         {/* Tabs */}
         <Tabs defaultValue="skills" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="skills">Skills</TabsTrigger>
-            <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Skills Tab */}
           <TabsContent value="skills">
-            <Card>
-              <CardHeader>
-                <CardTitle>Skills Management</CardTitle>
-                <CardDescription>
-                  Manage your skills and what you want to learn
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-8">
-                <SkillsSection
-                  title="Skills I Offer"
-                  skills={profileData.skillsOffered}
-                  type="offered"
-                  onChange={handleOfferedSkillsChange}
-                  // Removed searchQuery, setSearchQuery, filteredSkills props
-                />
+            <div className="grid gap-8 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-green-600">Skills I Offer</CardTitle>
+                  <CardDescription>
+                    Skills you can help others with
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SkillsSection
+                    title=""
+                    skills={profileData.skillsOffered}
+                    type="offered"
+                    onChange={handleOfferedSkillsChange}
+                  />
+                </CardContent>
+              </Card>
 
-                <SkillsSection
-                  title="Skills I Want to Learn"
-                  skills={profileData.skillsWanted}
-                  type="wanted"
-                  onChange={handleWantedSkillsChange}
-                  // Removed searchQuery, setSearchQuery, filteredSkills props
-                />
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-blue-600">Skills I Want to Learn</CardTitle>
+                  <CardDescription>
+                    Skills you'd like to learn from others
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SkillsSection
+                    title=""
+                    skills={profileData.skillsWanted}
+                    type="wanted"
+                    onChange={handleWantedSkillsChange}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
-          {/* Preferences Tab */}
-          <TabsContent value="preferences">
+          {/* Availability Tab */}
+          <TabsContent value="availability">
             <Card>
               <CardHeader>
-                <CardTitle>Preferences</CardTitle>
+                <CardTitle>Availability Settings</CardTitle>
                 <CardDescription>
-                  Configure your skill swap preferences
+                  Control when others can reach out to you
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="availability">Available for Skill Swaps</Label>
-                    <p className="text-sm text-gray-500">
-                      When enabled, others can see you're available for skill exchanges
+                  <div>
+                    <Label className="text-base font-medium">Available for Skill Exchange</Label>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Show that you're open to connecting with others
                     </p>
                   </div>
-                  <Switch
-                    id="availability"
-                    checked={profileData.isAvailable}
-                    onCheckedChange={(checked) =>
-                      setProfileData(prev => ({ ...prev, isAvailable: checked }))
-                    }
-                  />
+                  {isEditing ? (
+                    <Switch
+                      checked={profileData.isAvailable}
+                      onCheckedChange={(checked) => setProfileData(prev => ({ ...prev, isAvailable: checked }))}
+                    />
+                  ) : (
+                    <Badge variant={profileData.isAvailable ? "default" : "secondary"}>
+                      {profileData.isAvailable ? "Available" : "Unavailable"}
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -734,46 +909,34 @@ const Profile = () => {
           <TabsContent value="settings">
             <Card>
               <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
+                <CardTitle>Profile Settings</CardTitle>
                 <CardDescription>
-                  Manage your account information
+                  Manage your profile preferences
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-email">Email</Label>
-                    <Input
-                      id="settings-email"
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-location">Location</Label>
-                    <Input
-                      id="settings-location"
-                      value={profileData.location}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, location: e.target.value }))}
-                    />
+                  <h3 className="font-medium">Profile Visibility</h3>
+                  <p className="text-sm text-gray-600">
+                    Your profile is currently visible to all users. You can adjust visibility settings here.
+                  </p>
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="font-medium">Data Management</h3>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      Export Profile Data
+                    </Button>
+                    <Button variant="destructive" size="sm">
+                      Delete Profile
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Save Button for non-editing states */}
-        {!isEditing && (
-          <div className="mt-8 flex justify-end">
-            <Button onClick={handleSaveProfile} disabled={isLoading}>
-              <Save className="w-4 h-4 mr-2" />
-              {isLoading ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );

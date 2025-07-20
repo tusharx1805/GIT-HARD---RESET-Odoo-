@@ -4,26 +4,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Github, Linkedin, Phone, ExternalLink, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams,useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 
-
 const UserProfilePage = () => {
-  
   const [profileData, setProfileData] = useState({
     name: "",
     bio: "",
     location: "",
     email: "",
+    phone: "",
+    github: "",
+    linkedin: "",
     skillsOffered: [] as string[],
     skillsWanted: [] as string[],
     isAvailable: false,
     createdAt: "",
     updatedAt: "",
     skills: "",
-    rawData: {} as any, // Store the raw profile data for displaying all fields
+    rawData: {} as any,
   });
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [filteredProfiles, setFilteredProfiles] = useState<any[]>([]);
@@ -33,8 +34,31 @@ const UserProfilePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  
   if (!id) return <div>User not found</div>;
 
+  // Helper function to format GitHub URL
+  const formatGithubUrl = (github: string) => {
+    if (!github) return "";
+    if (github.startsWith("http")) return github;
+    if (github.startsWith("github.com/")) return `https://${github}`;
+    return `https://github.com/${github}`;
+  };
+
+  // Helper function to format LinkedIn URL
+  const formatLinkedinUrl = (linkedin: string) => {
+    if (!linkedin) return "";
+    if (linkedin.startsWith("http")) return linkedin;
+    if (linkedin.startsWith("linkedin.com/")) return `https://${linkedin}`;
+    if (linkedin.startsWith("in/")) return `https://linkedin.com/${linkedin}`;
+    return `https://linkedin.com/in/${linkedin}`;
+  };
+
+  // Helper function to format phone number for tel: link
+  const formatPhoneLink = (phone: string) => {
+    if (!phone) return "";
+    return `tel:${phone.replace(/\D/g, "")}`;
+  };
 
   useEffect(() => {
     // Fetch all profiles
@@ -75,15 +99,22 @@ const UserProfilePage = () => {
         if (error) throw error;
 
         // Parse skills from string to array if needed
-        const skillsOffered = data.skills_offered ? 
-          typeof data.skills_offered === 'string' ? data.skills_offered.split(',').map((s: string) => s.trim()) : data.skills_offered :
-          [];
-          
-        const skillsWanted = data.skills_wanted ? 
-          typeof data.skills_wanted === 'string' ? data.skills_wanted.split(',').map((s: string) => s.trim()) : data.skills_wanted :
-          [];
+        const parseSkills = (skillsData: any) => {
+          if (!skillsData) return [];
+          if (Array.isArray(skillsData)) return skillsData;
+          if (typeof skillsData === 'string') {
+            try {
+              const parsed = JSON.parse(skillsData);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return skillsData.replace(/[\[\]"']/g, '').split(',').map((s: string) => s.trim()).filter(s => s);
+            }
+          }
+          return [];
+        };
 
-        // Parse general skills if available
+        const skillsOffered = parseSkills(data.skills_offered);
+        const skillsWanted = parseSkills(data.skills_wanted);
         const skills = data.skills || "";
 
         setProfileData({
@@ -91,13 +122,16 @@ const UserProfilePage = () => {
           bio: data.bio || "",
           location: data.location || "",
           email: data.email || "",
+          phone: data.phone || data.phone_number || "",
+          github: data.github || data.github_url || data.github_username || "",
+          linkedin: data.linkedin || data.linkedin_url || data.linkedin_profile || "",
           skillsOffered,
           skillsWanted,
           isAvailable: data.is_available || false,
           createdAt: data.created_at || "",
           updatedAt: data.updated_at || "",
           skills,
-          rawData: data, // Store raw data to display all fields
+          rawData: data,
         });
         setLoading(false);
       } catch (err) {
@@ -195,6 +229,7 @@ const UserProfilePage = () => {
             </div>
           </div>
         )}
+        
         {/* Show specific profile if ID is provided */}
         {id ? (
           <>
@@ -213,14 +248,7 @@ const UserProfilePage = () => {
                       </Badge>
                       <p className="text-xs text-gray-400">Member since {new Date(profileData.createdAt).toLocaleDateString()}</p>
                     </div>
-                    {profileData.email && (
-                      <p className="text-sm flex items-center">
-                        <span className="font-medium mr-2">Email:</span> {profileData.email}
-                      </p>
-                    )}
                   </div>
-
-                  {/* Right Side: Profile Circle + Buttons */}
 
                   {/* Right Side: Profile Circle + Buttons */}
                   <div className="flex flex-col items-center space-y-2">
@@ -236,11 +264,97 @@ const UserProfilePage = () => {
                     <Button onClick={() => navigate("/messages", { state: { userId: id } })}>
                       Message
                     </Button>
-
                   </div>
                 </div>
-                </CardHeader>
-              </Card>
+              </CardHeader>
+            </Card>
+
+
+            {/* Contact Information */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Connect With Me</CardTitle>
+                <CardDescription>Ways to connect with this user</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Email */}
+                  {profileData.email && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Mail className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">Email</p>
+                        <a 
+                          href={`mailto:${profileData.email}`}
+                          className="text-sm text-blue-600 hover:text-blue-800 block truncate"
+                        >
+                          {profileData.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phone */}
+                  {profileData.phone && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Phone className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">Phone</p>
+                        <a 
+                          href={formatPhoneLink(profileData.phone)}
+                          className="text-sm text-green-600 hover:text-green-800 block truncate"
+                        >
+                          {profileData.phone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* GitHub */}
+                  {profileData.github && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Github className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">GitHub</p>
+                        <a 
+                          href={formatGithubUrl(profileData.github)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-gray-700 hover:text-gray-900 flex items-center truncate"
+                        >
+                          <span className="truncate">{profileData.github}</span>
+                          <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LinkedIn */}
+                  {profileData.linkedin && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Linkedin className="w-5 h-5 text-blue-700 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">LinkedIn</p>
+                        <a 
+                          href={formatLinkedinUrl(profileData.linkedin)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-700 hover:text-blue-900 flex items-center truncate"
+                        >
+                          <span className="truncate">{profileData.linkedin}</span>
+                          <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Show message if no contact info is available */}
+                {!profileData.email && !profileData.phone && !profileData.github && !profileData.linkedin && (
+                  <p className="text-sm text-gray-500 text-center py-4">No contact information provided</p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Skills Section */}
             <Card className="mb-8">
@@ -299,6 +413,10 @@ const UserProfilePage = () => {
                       // Skip arrays and objects for direct display
                       if (typeof value === 'object' && value !== null) return null;
                       
+                      // Skip the ID field and contact fields (they're shown above)
+                      if (key === 'id' || key === 'skills_offered' || key === 'skills_wanted' || key === 'skills' || 
+                          key === 'email' || key === 'phone' || key === 'github' || key === 'linkedin') return null;
+                      
                       // Format the key for display
                       const formattedKey = key.split('_').map(word => 
                         word.charAt(0).toUpperCase() + word.slice(1)
@@ -345,9 +463,33 @@ const UserProfilePage = () => {
                   <Card key={profile.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
-                        <div>
+                        <div className="flex-1">
                           <CardTitle className="text-lg">{profile.full_name || "Unnamed User"}</CardTitle>
                           <CardDescription className="line-clamp-1">{profile.location || "No location"}</CardDescription>
+                          
+                          {/* Contact indicators */}
+                          <div className="flex items-center space-x-2 mt-2">
+                            {profile.github && (
+                              <div title="GitHub available">
+                                <Github className="w-4 h-4 text-gray-600" />
+                              </div>
+                            )}
+                            {profile.linkedin && (
+                              <div title="LinkedIn available">
+                                <Linkedin className="w-4 h-4 text-blue-600" />
+                              </div>
+                            )}
+                            {profile.phone && (
+                              <div title="Phone available">
+                                <Phone className="w-4 h-4 text-green-600" />
+                              </div>
+                            )}
+                            {profile.email && (
+                              <div title="Email available">
+                                <Mail className="w-4 h-4 text-blue-500" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
                           {(profile.full_name || "U").split(" ").map((word: string) => word[0]).join("")}

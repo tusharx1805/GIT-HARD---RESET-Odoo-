@@ -1,11 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Star, Filter, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Star, Filter, Plus, ChevronLeft, ChevronRight, Languages } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
@@ -30,7 +29,45 @@ const Dashboard = () => {
   
   const PROFILES_PER_PAGE = 3;
 
-  const categories = ["All", "Technology", "Design", "Language", "Marketing", "Music", "Cooking", "Fitness"];
+  const categories = ["All", "Technology", "Design","Coding Languages","Cloud Computing", "Data Science", "Marketing", "Business", "Technical Writing"];
+
+  // Helper function to parse skills from various formats
+  const parseSkills = (skillsData: any): string[] => {
+    if (!skillsData) return [];
+    
+    // If it's already an array
+    if (Array.isArray(skillsData)) {
+      return skillsData.map(skill => String(skill).trim()).filter(Boolean);
+    }
+    
+    // If it's a string
+    if (typeof skillsData === 'string') {
+      let cleaned = skillsData.trim();
+      
+      // Remove outer brackets if present
+      if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+        cleaned = cleaned.substring(1, cleaned.length - 1);
+      }
+      
+      // Handle JSON array string
+      try {
+        const parsed = JSON.parse(`[${cleaned}]`);
+        if (Array.isArray(parsed)) {
+          return parsed.map(skill => String(skill).trim()).filter(Boolean);
+        }
+      } catch (e) {
+        // If JSON parsing fails, treat as comma-separated
+      }
+      
+      // Split by comma and clean each skill
+      return cleaned
+        .split(',')
+        .map(skill => skill.trim().replace(/^["']|["']$/g, '')) // Remove quotes
+        .filter(Boolean);
+    }
+    
+    return [];
+  };
 
   // Fetch current user
   useEffect(() => {
@@ -126,15 +163,17 @@ const Dashboard = () => {
       const fullName = profile.full_name?.toLowerCase() || "";
       const bio = profile.bio?.toLowerCase() || "";
       const location = profile.location?.toLowerCase() || "";
-      const skills = [
-        profile.skills_offered?.toLowerCase() || "",
-        profile.skills_wanted?.toLowerCase() || "",
-        profile.skills?.toLowerCase() || ""
-      ].join(",");
+      
+      // Parse skills properly for search
+      const skillsOffered = parseSkills(profile.skills_offered).join(" ").toLowerCase();
+      const skillsWanted = parseSkills(profile.skills_wanted).join(" ").toLowerCase();
+      const skills = parseSkills(profile.skills).join(" ").toLowerCase();
       
       return fullName.includes(query) || 
              bio.includes(query) || 
              location.includes(query) || 
+             skillsOffered.includes(query) ||
+             skillsWanted.includes(query) ||
              skills.includes(query);
     });
 
@@ -165,7 +204,7 @@ const Dashboard = () => {
     // Apply category filter if not "All"
     if (selectedCategory !== "All") {
       filtered = filtered.filter(profile => {
-        const skillsOffered = profile.skills_offered || "";
+        const skillsOffered = parseSkills(profile.skills_offered).join(" ");
         return skillsOffered.toLowerCase().includes(selectedCategory.toLowerCase());
       });
     }
@@ -204,8 +243,7 @@ const Dashboard = () => {
       
       // First, find the UUIDs for the skills from the skills table
       // Look up offered skill UUID
-      // Clean up skill name - remove quotes and brackets if present
-      const cleanOfferedSkill = offeredSkill.replace(/[\[\]"]/g, '').trim();
+      const cleanOfferedSkill = offeredSkill.trim();
       console.log(`Looking up offered skill: "${cleanOfferedSkill}"`); 
       
       const { data: offeredSkillData, error: offeredSkillError } = await supabase
@@ -220,8 +258,7 @@ const Dashboard = () => {
       }
       
       // Look up wanted skill UUID
-      // Clean up skill name - remove quotes and brackets if present
-      const cleanWantedSkill = wantedSkill.replace(/[\[\]"]/g, '').trim();
+      const cleanWantedSkill = wantedSkill.trim();
       console.log(`Looking up wanted skill: "${cleanWantedSkill}"`); 
       
       const { data: wantedSkillData, error: wantedSkillError } = await supabase
@@ -316,34 +353,37 @@ const Dashboard = () => {
                   </div>
                 ) : filteredProfiles.length > 0 ? (
                   <div>
-                    {filteredProfiles.map((profile) => (
-                      <Link 
-                        to={`/user/${profile.id}`} 
-                        key={profile.id}
-                        className="block p-3 hover:bg-slate-50 transition-colors border-b last:border-0"
-                        onClick={() => setShowProfileResults(false)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                            {(profile.full_name || "U").split(" ").map((word: string) => word[0]).join("")}
+                    {filteredProfiles.map((profile) => {
+                      const skillsOffered = parseSkills(profile.skills_offered);
+                      return (
+                        <Link 
+                          to={`/user/${profile.id}`} 
+                          key={profile.id}
+                          className="block p-3 hover:bg-slate-50 transition-colors border-b last:border-0"
+                          onClick={() => setShowProfileResults(false)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                              {(profile.full_name || "U").split(" ").map((word: string) => word[0]).join("")}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{profile.full_name || "Unnamed User"}</p>
+                              <p className="text-sm text-slate-500 truncate">{profile.location || "No location"}</p>
+                              {skillsOffered.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {skillsOffered.slice(0, 2).map((skill: string, i: number) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                                  ))}
+                                  {skillsOffered.length > 2 && (
+                                    <span className="text-xs text-slate-500">+{skillsOffered.length - 2} more</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{profile.full_name || "Unnamed User"}</p>
-                            <p className="text-sm text-slate-500 truncate">{profile.location || "No location"}</p>
-                            {profile.skills_offered && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {profile.skills_offered.split(',').slice(0, 2).map((skill: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">{skill.trim()}</Badge>
-                                ))}
-                                {profile.skills_offered.split(',').length > 2 && (
-                                  <span className="text-xs text-slate-500">+{profile.skills_offered.split(',').length - 2} more</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 text-center">
@@ -372,13 +412,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Add Skill Button */}
-        <div className="mb-6">
-          <Button className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white">
-            <Plus className="w-4 h-4 mr-2" />
-            Share Your Skills
-          </Button>
-        </div>
+        
 
         {/* Profiles Grid */}
         <div className="space-y-6">
@@ -390,8 +424,8 @@ const Dashboard = () => {
           ) : displayedProfiles.length > 0 ? (
             displayedProfiles.map((profile) => {
               const initials = (profile.full_name || "U").split(" ").map((word: string) => word[0]).join("");
-              const skillsOffered = profile.skills_offered ? profile.skills_offered.split(',').map((s: string) => s.trim()) : [];
-              const skillsWanted = profile.skills_wanted ? profile.skills_wanted.split(',').map((s: string) => s.trim()) : [];
+              const skillsOffered = parseSkills(profile.skills_offered);
+              const skillsWanted = parseSkills(profile.skills_wanted);
               const rating = profile.rating || Math.floor(Math.random() * 3) + 2; // Random rating between 2-5 if not available
               const reviews = profile.reviews || Math.floor(Math.random() * 10) + 1; // Random reviews if not available
               
@@ -470,24 +504,12 @@ const Dashboard = () => {
                               className="bg-blue-600 hover:bg-blue-700 text-white"
                               onClick={() => {
                                 // Find a skill to offer and a skill to request
-                                // Parse skills properly - remove any array notation if present
-                                const parseSkill = (skillStr: string | null | undefined): string => {
-                                  if (!skillStr) return "General Skills";
-                                  
-                                  // Remove array notation if present
-                                  let cleaned = skillStr.trim();
-                                  if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
-                                    cleaned = cleaned.substring(1, cleaned.length - 1);
-                                  }
-                                  
-                                  // Get first skill from comma-separated list
-                                  const skills = cleaned.split(',');
-                                  const firstSkill = skills[0]?.trim().replace(/\"/g, '');
-                                  return firstSkill || "General Skills";
-                                };
+                                const currentUserSkills = parseSkills(currentUser?.skills_offered);
+                                const profileSkills = parseSkills(profile.skills_offered);
                                 
-                                const offeredSkill = parseSkill(currentUser?.skills_offered);
-                                const wantedSkill = parseSkill(profile.skills_offered);
+                                const offeredSkill = currentUserSkills.length > 0 ? currentUserSkills[0] : "General Skills";
+                                const wantedSkill = profileSkills.length > 0 ? profileSkills[0] : "General Skills";
+                                
                                 handleSendRequest(profile.id, offeredSkill, wantedSkill);
                               }}
                             >
