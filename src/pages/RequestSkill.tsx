@@ -73,8 +73,11 @@ const RequestSkill = () => {
   };
 
   // Improved helper function to resolve user display name (similar to UserProfilePage approach)
-  const getUserDisplayName = (profile: any) => {
-    if (!profile) return "Unknown User";
+  const getUserDisplayName = (profile: any, userId: string) => {
+    if (!profile) {
+      // If no profile found, extract username from userId or show a generic name
+      return userId ? `User ${userId.slice(0, 8)}` : "User";
+    }
     
     // First priority: full_name (same as UserProfilePage)
     if (profile.full_name?.trim()) {
@@ -102,12 +105,13 @@ const RequestSkill = () => {
       }
     }
     
-    return "Unknown User";
+    // Final fallback: use part of userId
+    return userId ? `User ${userId.slice(0, 8)}` : "User";
   };
 
   // Helper function to get user initials for avatar
   const getUserInitials = (displayName: string) => {
-    if (!displayName || displayName === "Unknown User") return "U";
+    if (!displayName || displayName.startsWith("User")) return "U";
     
     const words = displayName.trim().split(' ');
     if (words.length >= 2) {
@@ -186,8 +190,21 @@ const RequestSkill = () => {
           const isCurrentUserSender = request.sender_id === currentUser.id;
           const otherUserId = isCurrentUserSender ? request.receiver_id : request.sender_id;
           
-          // Get other user's profile with improved error handling
-          const otherUserProfile = await fetchUserProfile(otherUserId);
+          // Get other user's profile - simplified query
+          let otherUserProfile = null;
+          try {
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", otherUserId)
+              .single();
+              
+            if (!error && data) {
+              otherUserProfile = data;
+            }
+          } catch (error) {
+            console.log("Profile not found for user:", otherUserId);
+          }
           
           console.log("Fetched profile for otherUserId:", otherUserId, otherUserProfile);
 
@@ -196,7 +213,7 @@ const RequestSkill = () => {
           const wantedSkillName = await getSkillName(request.wanted_skill);
 
           // Get display name using improved function
-          const displayName = getUserDisplayName(otherUserProfile);
+          const displayName = getUserDisplayName(otherUserProfile, otherUserId);
           const initials = getUserInitials(displayName);
             
           return {
