@@ -6,11 +6,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams,useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 
+
 const UserProfilePage = () => {
-  const { id } = useParams();
+  
   const [profileData, setProfileData] = useState({
     name: "",
     bio: "",
@@ -30,6 +31,10 @@ const UserProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  if (!id) return <div>User not found</div>;
+
 
   useEffect(() => {
     // Fetch all profiles
@@ -216,19 +221,26 @@ const UserProfilePage = () => {
                   </div>
 
                   {/* Right Side: Profile Circle + Buttons */}
+
+                  {/* Right Side: Profile Circle + Buttons */}
                   <div className="flex flex-col items-center space-y-2">
+                    {/* Profile initials */}
                     <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                      {profileData.name?.split(" ").map(word => word[0]).join("") || "U"}
+                      {profileData.name
+                        ?.split(" ")
+                        .map((word) => word[0])
+                        .join("") || "U"}
                     </div>
 
-                    <Button>
-                      
+                    {/* Message Button */}
+                    <Button onClick={() => navigate("/messages", { state: { userId: id } })}>
                       Message
                     </Button>
+
                   </div>
                 </div>
-              </CardHeader>
-            </Card>
+                </CardHeader>
+              </Card>
 
             {/* Skills Section */}
             <Card className="mb-8">

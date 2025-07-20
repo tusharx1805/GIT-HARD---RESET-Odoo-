@@ -9,7 +9,10 @@ import {
   LogOut, 
   Menu, 
   X,
-  Bell
+  Bell,
+  LayoutDashboard,
+  Send,
+  MessageSquare
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useUser } from "@/lib/useUser";
+
+
 
 interface NavigationProps {
   showBreadcrumbs?: boolean;
@@ -34,6 +40,31 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [hasUnreadMessage, setHasUnreadMessage] = useState(false);
+  const { user } = useUser();
+  const Dot = () => (
+  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-blue-500 shadow" />
+  )
+
+  const fetchNotifications = async () => {
+  if (!currentUser) return;
+
+  const { data, error } = await supabase
+    .from("swap_requests")
+    .select("status")
+    .eq("receiver_id", currentUser.id);
+
+  if (error) {
+    console.error("Error fetching notifications:", error);
+    return;
+  }
+
+  const pendingRequests = data?.filter(req => req.status === "pending") ?? [];
+  setNotificationCount(pendingRequests.length);
+};
+
+
 
   // Fetch current user
   useEffect(() => {
@@ -113,16 +144,29 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
   };
 
   const navItems = [
-    { name: "Dashboard", path: "/dashboard", icon: <Home className="w-4 h-4 mr-2" /> },
-    { 
-      name: "Requests", 
-      path: "/requests", 
-      icon: <Bell className="w-4 h-4 mr-2" />,
-      badge: notificationCount > 0 ? notificationCount : undefined
+    {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: <LayoutDashboard className="w-5 h-5" />
     },
-    { name: "Messages", path: "/messages", icon: <MessageCircle className="w-4 h-4 mr-2" /> },
-    { name: "Profile", path: "/profile", icon: <User className="w-4 h-4 mr-2" /> },
+    {
+      name: "Requests",
+      path: "/requests",
+      icon: <Send className="w-5 h-5" />,
+      badge: notificationCount > 0 ? notificationCount : undefined // use "dot" fallback
+    },
+    {
+      name: "Messages",
+      path: "/messages",
+      icon: <MessageSquare className="w-5 h-5" />
+    },
+    {
+      name: "Profile",
+      path: "/profile",
+      icon: <User className="w-5 h-5" />
+    }
   ];
+
 
   return (
     <header className="glass-primary sticky top-0 z-10 backdrop-blur-xl">
@@ -153,8 +197,10 @@ const Navigation = ({ showBreadcrumbs = false, currentPage = "" }: NavigationPro
                   <Button 
                     variant={location.pathname === item.path ? "default" : "ghost"} 
                     size="sm" 
-                    className={`relative ${location.pathname === item.path ? 'glass-accent text-accent-foreground' : 'glass-secondary text-body hover:text-heading'} focus-ring`}
-                  >
+                    className={`relative ${location.pathname === item.path 
+                      ? 'glass-accent text-heading'  // <-- changed this from text-accent-foreground
+                      : 'glass-secondary text-body hover:text-heading'} focus-ring`}
+                      >
                     {item.icon}
                     {item.name}
                     {item.badge && (

@@ -53,18 +53,88 @@ const RequestSkill = () => {
   const getSkillName = async (skillId: string) => {
     if (!skillId) return "Unknown Skill";
     
-    const { data, error } = await supabase
-      .from("skills")
-      .select("name")
-      .eq("id", skillId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("skills")
+        .select("name")
+        .eq("id", skillId)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching skill:", error);
+        return "Unknown Skill";
+      }
       
-    if (error) {
-      console.error("Error fetching skill:", error);
+      return data?.name || "Unknown Skill";
+    } catch (error) {
+      console.error("Error in getSkillName:", error);
       return "Unknown Skill";
     }
+  };
+
+  // Improved helper function to resolve user display name (similar to UserProfilePage approach)
+  const getUserDisplayName = (profile: any) => {
+    if (!profile) return "Unknown User";
     
-    return data?.name || "Unknown Skill";
+    // First priority: full_name (same as UserProfilePage)
+    if (profile.full_name?.trim()) {
+      return profile.full_name.trim();
+    }
+    
+    // Second priority: combine first_name and last_name
+    const firstName = profile.first_name?.trim() || '';
+    const lastName = profile.last_name?.trim() || '';
+    if (firstName || lastName) {
+      const combinedName = `${firstName} ${lastName}`.trim();
+      if (combinedName) return combinedName;
+    }
+    
+    // Third priority: username if available
+    if (profile.username?.trim()) {
+      return profile.username.trim();
+    }
+    
+    // Last resort: email username part
+    if (profile.email?.trim()) {
+      const emailParts = profile.email.split('@');
+      if (emailParts[0]) {
+        return emailParts[0];
+      }
+    }
+    
+    return "Unknown User";
+  };
+
+  // Helper function to get user initials for avatar
+  const getUserInitials = (displayName: string) => {
+    if (!displayName || displayName === "Unknown User") return "U";
+    
+    const words = displayName.trim().split(' ');
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return displayName.charAt(0).toUpperCase();
+  };
+
+  // Helper function to fetch user profile with better error handling
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, first_name, last_name, username, email, avatar_url, rating")
+        .eq("id", userId)
+        .maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when no rows found
+        
+      if (error) {
+        console.error("Error fetching user profile:", error, "for userId:", userId);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error("Exception in fetchUserProfile:", error, "for userId:", userId);
+      return null;
+    }
   };
 
   // Fetch all requests related to the current user
@@ -116,31 +186,28 @@ const RequestSkill = () => {
           const isCurrentUserSender = request.sender_id === currentUser.id;
           const otherUserId = isCurrentUserSender ? request.receiver_id : request.sender_id;
           
-          // Get other user's profile
-          const { data: data, error: profileError } = await supabase
-            .from("profiles")
-            .select("full_name, avatar_url, rating, email")
-            .eq("id", otherUserId)
-            .single();
+          // Get other user's profile with improved error handling
+          const otherUserProfile = await fetchUserProfile(otherUserId);
+          
+          console.log("Fetched profile for otherUserId:", otherUserId, otherUserProfile);
 
-          if (profileError) {
-            console.error("Error fetching other user's profile:", profileError, "for userId:", otherUserId);
-          }
-          console.log("Fetched profile for otherUserId:", otherUserId, data);
-
-          // Get skill names name: 
+          // Get skill names with error handling
           const offeredSkillName = await getSkillName(request.offered_skill);
           const wantedSkillName = await getSkillName(request.wanted_skill);
+
+          // Get display name using improved function
+          const displayName = getUserDisplayName(otherUserProfile);
+          const initials = getUserInitials(displayName);
             
           return {
             id: request.id,
-            name: data?.full_name || data?.email || `Click on view profile`,
-            avatarUrl: data?.avatar_url || null,
-            avatarInitial: (data?.full_name?.charAt(0) || data?.email?.charAt(0) || "U"),
+            name: displayName,
+            avatarUrl: otherUserProfile?.avatar_url || null,
+            avatarInitial: initials,
             skillOffered: isCurrentUserSender ? offeredSkillName : wantedSkillName,
             skillWanted: isCurrentUserSender ? wantedSkillName : offeredSkillName,
             status: request.status,
-            rating: data?.rating || 0,
+            rating: otherUserProfile?.rating || 0,
             date: new Date(request.created_at).toLocaleDateString(),
             isCurrentUserSender,
             otherUserId,
@@ -196,18 +263,31 @@ const RequestSkill = () => {
       // Create a new conversation for the users if one doesn't exist
       const request = requests.find(r => r.id === id);
       if (request) {
-        const { error: convError } = await supabase
+        // Check if conversation already exists
+        const { data: existingConv, error: checkError } = await supabase
           .from("conversations")
-          .insert([
-            {
-              user1_id: currentUser.id,
-              user2_id: request.otherUserId,
-              created_at: new Date().toISOString()
-            }
-          ]);
+          .select("id")
+          .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${request.otherUserId}),and(user1_id.eq.${request.otherUserId},user2_id.eq.${currentUser.id})`)
+          .maybeSingle();
           
-        if (convError) {
-          console.error("Error creating conversation:", convError);
+        if (checkError) {
+          console.error("Error checking existing conversation:", checkError);
+        }
+        
+        if (!existingConv) {
+          const { error: convError } = await supabase
+            .from("conversations")
+            .insert([
+              {
+                user1_id: currentUser.id,
+                user2_id: request.otherUserId,
+                created_at: new Date().toISOString()
+              }
+            ]);
+            
+          if (convError) {
+            console.error("Error creating conversation:", convError);
+          }
         }
       }
     } catch (error) {
@@ -305,9 +385,9 @@ const RequestSkill = () => {
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-semibold text-lg overflow-hidden">
+                      <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
                         {request.avatarUrl ? 
-                          <img src={request.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : 
+                          <img src={request.avatarUrl} alt={`${request.name}'s avatar`} className="w-full h-full object-cover rounded-full" /> : 
                           request.avatarInitial
                         }
                       </div>
@@ -315,7 +395,7 @@ const RequestSkill = () => {
                         <div className="flex items-center space-x-2">
                           <h3 className="font-semibold text-lg text-slate-900">{request.name}</h3>
                           <Link to={`/user/${request.otherUserId}`}>
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-blue-600">
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800">
                               View Profile
                             </Button>
                           </Link>

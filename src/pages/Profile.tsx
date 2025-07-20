@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { Edit, Search, X, Upload, User, Save } from "lucide-react";
 import { useEffect, useState, useMemo } from "react"; // Import useMemo
 import Navigation from "@/components/Navigation";
+import { useCallback } from "react";
 
 interface ProfileData {
   name: string;
@@ -46,6 +47,20 @@ const Profile = () => {
     isAvailable: false,
     avatar_url: ""
   });
+  const handleOfferedSkillsChange = useCallback(
+    (skills: string[]) => {
+      setProfileData((prev) => ({ ...prev, skills_offered: skills }));
+    },
+    []
+  );
+
+  const handleWantedSkillsChange = useCallback(
+    (skills: string[]) => {
+      setProfileData((prev) => ({ ...prev, skills_wanted: skills }));
+    },
+    []
+  );
+
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -363,11 +378,13 @@ const Profile = () => {
     title,
     skills,
     type,
+    onChange
     // Remove searchQuery and filteredSkills from props if you manage them locally
   }: {
     title: string;
     skills: string[];
     type: 'offered' | 'wanted';
+    onChange: (skills: string[]) => void;
   }) => {
     // Manage search query state locally within SkillsSection
     const [localSearchQuery, setLocalSearchQuery] = useState("");
@@ -669,6 +686,7 @@ const Profile = () => {
                   title="Skills I Offer"
                   skills={profileData.skillsOffered}
                   type="offered"
+                  onChange={handleOfferedSkillsChange}
                   // Removed searchQuery, setSearchQuery, filteredSkills props
                 />
 
@@ -676,6 +694,7 @@ const Profile = () => {
                   title="Skills I Want to Learn"
                   skills={profileData.skillsWanted}
                   type="wanted"
+                  onChange={handleWantedSkillsChange}
                   // Removed searchQuery, setSearchQuery, filteredSkills props
                 />
               </CardContent>
